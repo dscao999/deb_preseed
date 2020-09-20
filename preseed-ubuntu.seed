@@ -157,6 +157,10 @@ d-i partman/confirm_nooverwrite boolean true
 d-i     tasksel/first   multiselect OpenSSH server
 openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
+#
+# Individual additional packages to install
+d-i pkgsel/include string vim
+#
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true
 #
