@@ -17,6 +17,10 @@ d-i netcfg/get_domain string
 # change to false to disable asking.
 d-i hw-detect/load_firmware boolean false
 #
+# umount old partition
+#
+d-i     preseed/early_command   string grep /media /proc/mounts > /dev/null 2>&1 && umount /media
+#
 # select the mirror site to use:
 #
 # If you select ftp, the mirror/country string does not need to be set.
