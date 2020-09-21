@@ -10,7 +10,7 @@ local_desc = "Extra_Packages.gz"
 
 def check_local_package(pkg_name):
     if not os.path.isfile(local_desc):
-        return
+        return 0
 
     mf = gzip.open(local_desc, 'r')
     for nline in mf:
@@ -19,10 +19,9 @@ def check_local_package(pkg_name):
             opkg = oline.split()[1]
             if opkg == pkgname:
                 print("Package {} already processed.".format(pkgname))
-                mf.close()
-                drain_stdin()
-                sys.exit(0)
+                return 1
     mf.close()
+    return 0
 
 def drain_stdin():
     for mline in sys.stdin:
@@ -37,14 +36,12 @@ def download_deb(url_prefix, url_path):
 
     print("Local Path: {}".format(cpath))
     if not os.path.exists(cpath):
-#        print("Will create dir: {}".format(cpath))
         os.makedirs(cpath)
     url = url_prefix + '/' + url_path
     local_file = cpath + '/' + dirs[-1]
     if not os.path.exists(local_file):
         try:
             wget.download(url, local_file)
-#           print("Will download: {} to {}".format(url, local_file))
         except:
             print("Error, Cannot download {}".format(url, ))
 
@@ -61,14 +58,15 @@ if len(pkgname) == 0:
     drain_stdin()
     sys.exit(1)
 
-check_local_package(pkgname)
+if check_local_package(pkgname) == 1:
+    drain_stdin()
+    exit(0)
 
 location = sys.stdin.readline().split()[1]
 prefix = '/var/lib/apt/lists/'
 idx = location.index(prefix)
 mpaths = location[idx+len(prefix):].rstrip(')').split('_')
 url_prefix = "http://" + mpaths[0] + '/' + mpaths[1]
-print("URL Prefix: {}".format(url_prefix))
 url = "http:/"
 for name in mpaths:
     url += '/' + name 
@@ -89,6 +87,7 @@ if not os.path.isfile(pkg_desc):
         sys.exit(5)
 
 pf = gzip.open(pkg_desc)
+cpkg = ''
 for bline in pf:
     mline = bline.decode('utf-8')
     if mline.find("Package:") == 0:

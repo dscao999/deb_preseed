@@ -99,7 +99,7 @@ d-i  base-installer/kernel/altmeta   string lts-xenial
 #
 # disk partition operations
 #
-partman-auto    partman-auto/select_disk        select /dev/vda
+partman-auto    partman-auto/select_disk        select /dev/sda
 #d-i partman-auto/disk string /dev/vda
 # In addition, you’ll need to specify the method to use.
 # The presently available methods are:
@@ -154,12 +154,27 @@ d-i partman/choose_partition select finish
 d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
 #
+# Uncomment this if you don’t want to use a network mirror.
+#d-i apt-setup/use_mirror boolean false
+#
+# By default the installer requires that repositories be authenticated
+#  using a known gpg key. This setting can be used to disable that
+#  authentication. Warning: Insecure, not recommended.
+#d-i debian-installer/allow_unauthenticated boolean true
+#
+# You can choose to install non-free and contrib software.
+#d-i apt-setup/non-free boolean true
+#d-i apt-setup/contrib boolean true
+#
+# Whether to upgrade packages after debootstrap.
+# # Allowed values: none, safe-upgrade, full-upgrade
+# #d-i pkgsel/upgrade select none
 d-i     tasksel/first   multiselect OpenSSH server
 openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
 #
 # Individual additional packages to install
-d-i pkgsel/include string vim
+d-i pkgsel/include string vim openbox xinit
 #
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true
