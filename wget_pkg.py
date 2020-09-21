@@ -6,6 +6,24 @@ import os.path
 import subprocess
 import wget
 
+local_desc = "Extra_Packages.gz"
+
+def check_local_package(pkg_name):
+    if not os.path.isfile(local_desc):
+        return
+
+    mf = gzip.open(local_desc, 'r')
+    for nline in mf:
+        oline = nline.decode('utf-8')
+        if oline.find("Package:") == 0:
+            opkg = oline.split()[1]
+            if opkg == pkgname:
+                print("Package {} already processed.".format(pkgname))
+                mf.close()
+                drain_stdin()
+                sys.exit(0)
+    mf.close()
+
 def drain_stdin():
     for mline in sys.stdin:
         continue
@@ -43,8 +61,9 @@ if len(pkgname) == 0:
     drain_stdin()
     sys.exit(1)
 
-location = sys.stdin.readline().split()[1]
+check_local_package(pkgname)
 
+location = sys.stdin.readline().split()[1]
 prefix = '/var/lib/apt/lists/'
 idx = location.index(prefix)
 mpaths = location[idx+len(prefix):].rstrip(')').split('_')
@@ -82,20 +101,6 @@ if cpkg != pkgname:
     print("No package found.")
     drain_stdin()
     sys.exit(2)
-
-local_desc = "Extra_Packages.gz"
-if os.path.isfile(local_desc):
-    mf = gzip.open(local_desc, 'r')
-    for nline in mf:
-        oline = nline.decode('utf-8')
-        if oline.find("Package:") == 0:
-            opkg = oline.split()[1]
-            if opkg == pkgname:
-                print("Package {} already processed.".format(pkgname))
-                mf.close()
-                drain_stdin()
-                sys.exit(0)
-    mf.close()
 
 mf = gzip.open(local_desc, 'a')
 mf.write(mline.encode('utf-8'))
