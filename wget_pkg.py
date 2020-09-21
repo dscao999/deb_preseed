@@ -9,6 +9,27 @@ import wget
 def drain_stdin():
     for mline in sys.stdin:
         continue
+    print('')
+
+def download_deb(url_prefix, url_path):
+    cpath = '.'
+    dirs = url_path.split('/')
+    for cwd in dirs[:-1]:
+        cpath += '/' + cwd
+
+    print("Local Path: {}".format(cpath))
+    if not os.path.exists(cpath):
+#        print("Will create dir: {}".format(cpath))
+        os.makedirs(cpath)
+    url = url_prefix + '/' + url_path
+    local_file = cpath + '/' + dirs[-1]
+    if not os.path.exists(local_file):
+        try:
+            wget.download(url, local_file)
+#           print("Will download: {} to {}".format(url, local_file))
+        except:
+            print("Error, Cannot download {}".format(url, ))
+
 
 pkgname = ''
 for mline in sys.stdin:
@@ -39,7 +60,6 @@ for name in mpaths[2:]:
 url += '.gz'
 print("URL: {}".format(url))
 pkg_desc += '.gz'
-print("Package file: {}".format(pkg_desc))
 
 if not os.path.isfile(pkg_desc):
     try:
@@ -54,24 +74,37 @@ for bline in pf:
     mline = bline.decode('utf-8')
     if mline.find("Package:") == 0:
         cpkg = mline.split()[1]
-        if cpkg != pkgname:
-            continue
-        else:
+        if cpkg == pkgname:
             break
 
 if cpkg != pkgname:
+    pf.close()
     print("No package found.")
     drain_stdin()
     sys.exit(2)
 
-mf = gzip.open("Extra_Packages.gz", 'a')
+local_desc = "Extra_Packages.gz"
+if os.path.isfile(local_desc):
+    mf = gzip.open(local_desc, 'r')
+    for nline in mf:
+        oline = nline.decode('utf-8')
+        if oline.find("Package:") == 0:
+            opkg = oline.split()[1]
+            if opkg == pkgname:
+                print("Package {} already processed.".format(pkgname))
+                mf.close()
+                drain_stdin()
+                sys.exit(0)
+    mf.close()
+
+mf = gzip.open(local_desc, 'a')
 mf.write(mline.encode('utf-8'))
 for bline in pf:
     mline = bline.decode('utf-8')
     idx = mline.find("Filename: ")
     if idx == 0:
         deb_url = url_prefix + '/' + mline.split()[1]
-        print("Download: {}".format(deb_url))
+        download_deb(url_prefix, mline.split()[1])
     mf.write(mline.encode('utf-8'))
     if len(mline.rstrip()) == 0:
         break
