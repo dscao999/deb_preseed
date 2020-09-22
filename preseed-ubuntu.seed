@@ -32,7 +32,7 @@ d-i mirror/http/proxy string
 # By default the installer requires that repositories be authenticated
 # using a known gpg key. This setting can be used to disable that
 # authentication. Warning: Insecure, not recommended.
-#d-i debian-installer/allow_unauthenticated boolean true
+d-i debian-installer/allow_unauthenticated boolean true
 #
 #
 # User account
@@ -99,7 +99,8 @@ d-i  base-installer/kernel/altmeta   string lts-xenial
 #
 # disk partition operations
 #
-partman-auto    partman-auto/select_disk        select /dev/sda
+#partman-auto    partman-auto/disk        string /dev/sda
+partman-auto    partman-auto/select_disk        select /dev/sda /dev/vda
 #d-i partman-auto/disk string /dev/vda
 # In addition, you’ll need to specify the method to use.
 # The presently available methods are:
@@ -168,7 +169,7 @@ d-i partman/confirm_nooverwrite boolean true
 #
 # Whether to upgrade packages after debootstrap.
 # # Allowed values: none, safe-upgrade, full-upgrade
-# #d-i pkgsel/upgrade select none
+d-i pkgsel/upgrade select none
 d-i     tasksel/first   multiselect OpenSSH server
 openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
@@ -184,7 +185,10 @@ user-setup-udeb user-setup/encrypt-home boolean false
 #
 # Execute late commands
 #
-#d-i preseed/late_command string in-target sed -e 's/C/C.UTF-8/' -i /etc/default/locale
+d-i preseed/late_command string in-target sed -e '$aset -o vi' -i /etc/profile
+#d-i preseed/late_command string in-target [ -f /etc/init/tty1.conf ] &&  \
+#	cp /etc/init/tty1.conf /etc/init/ttyS0.conf && \
+#	sed -i -e 's/tty1/ttyS0/g' -e 's/38400/115200/' /etc/init/ttyS0.conf
 #
 # During installations from serial console, the regular virtual consoles
 # (VT1-VT6) are normally disabled in /etc/inittab. Uncomment the next
