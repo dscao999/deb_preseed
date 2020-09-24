@@ -170,12 +170,12 @@ d-i partman/confirm_nooverwrite boolean true
 # Whether to upgrade packages after debootstrap.
 # # Allowed values: none, safe-upgrade, full-upgrade
 d-i pkgsel/upgrade select none
-d-i     tasksel/first   multiselect OpenSSH server
+#d-i     tasksel/first   multiselect OpenSSH server
 openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
 #
 # Individual additional packages to install
-d-i pkgsel/include string vim openbox xinit
+d-i pkgsel/include string vim openbox xinit openssh-server
 #
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true
