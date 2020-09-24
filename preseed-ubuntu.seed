@@ -185,10 +185,7 @@ user-setup-udeb user-setup/encrypt-home boolean false
 #
 # Execute late commands
 #
-d-i preseed/late_command string in-target sed -e '$aset -o vi' -i /etc/profile
-#d-i preseed/late_command string in-target [ -f /etc/init/tty1.conf ] &&  \
-#	cp /etc/init/tty1.conf /etc/init/ttyS0.conf && \
-#	sed -i -e 's/tty1/ttyS0/g' -e 's/38400/115200/' /etc/init/ttyS0.conf
+d-i preseed/late_command string sh /cdrom/lenovo/post-task.sh
 #
 # During installations from serial console, the regular virtual consoles
 # (VT1-VT6) are normally disabled in /etc/inittab. Uncomment the next
