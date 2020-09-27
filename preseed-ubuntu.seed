@@ -19,7 +19,7 @@ d-i hw-detect/load_firmware boolean false
 #
 # umount old partition
 #
-d-i     preseed/early_command   string grep /media /proc/mounts > /dev/null 2>&1 && umount /media
+d-i     preseed/early_command   string if grep /media /proc/mounts > /dev/null 2>&1; then umount /media; fi
 #
 # select the mirror site to use:
 #
@@ -122,6 +122,8 @@ d-i partman-md/device_remove_md boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 #
+#d-i partman-auto/choose_recipe select boot-root
+#
 d-i partman-auto/expert_recipe string                         \
       boot-root ::                                            \
               64 64 64 fat16                                  \
@@ -175,7 +177,7 @@ openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
 #
 # Individual additional packages to install
-d-i pkgsel/include string vim openbox xinit openssh-server
+d-i pkgsel/include string vim openbox xinit openssh-server tree
 #
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true

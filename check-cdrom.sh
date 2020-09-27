@@ -6,6 +6,16 @@ then
 else
 	CDDIR=/media/cdrom
 fi
+if ! fgrep $CDDIR /proc/mounts > /dev/null 2>&1
+then
+	echo "$CDDIR is not a mount point"
+	exit 1
+fi
+if [ ! -f $CDDIR/.disk/base_installable ]
+then
+	echo "$CDDIR is not an installation cdrom media"
+	exit 2
+fi
 #
 dpkg --list | awk '/^ii/ {print $2}' | \
 while read pkg_name

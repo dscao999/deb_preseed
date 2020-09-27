@@ -34,7 +34,6 @@ def download_deb(url_prefix, url_path):
     for cwd in dirs[:-1]:
         cpath += '/' + cwd
 
-    print("Local Path: {}".format(cpath))
     if not os.path.exists(cpath):
         os.makedirs(cpath)
     url = url_prefix + '/' + url_path
@@ -75,7 +74,6 @@ for name in mpaths[2:]:
     pkg_desc += '_' + name
 
 url += '.gz'
-print("URL: {}".format(url))
 pkg_desc += '.gz'
 
 if not os.path.isfile(pkg_desc):
