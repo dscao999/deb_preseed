@@ -41,8 +41,8 @@ for sline in fin:
         inter_dirs = old_path.split('/')
         if inter_dirs[0] == '.':
             inter_dirs = inter_dirs[1:]
-        new_path = './pool/inhouse/' + inter_dirs[0][0:1]
-        old_path = './cloudtimes'
+        new_path = 'pool/inhouse/' + inter_dirs[0][0:1]
+        old_path = 'cloudtimes'
         for dent in inter_dirs[0:-1]:
             new_path += '/' + dent
             old_path += '/' + dent
@@ -63,6 +63,7 @@ for sline in fin:
                         ndeb.write(buf)
                         buf = ideb.read(4096)
                 ndeb.close()
+                mline = "Filename: " + new_path + '\n'
 
     lines.append(mline)
 
