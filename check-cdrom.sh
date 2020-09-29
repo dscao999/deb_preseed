@@ -21,7 +21,7 @@ dpkg --list | awk '/^ii/ {print $2}' | \
 while read pkg_name
 do
 	pkg=${pkg_name%%:*}
-	fname=$(find $CDDIR -name ${pkg}\* -print 2> /dev/null)
+	fname=$(find $CDDIR -name ${pkg}\*.deb -print 2> /dev/null)
 	[ -z "$fname" ] || continue
 	if ! apt-cache show $pkg > /dev/null 2>&1
 	then

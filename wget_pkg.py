@@ -59,9 +59,12 @@ if len(pkgname) == 0:
 
 if check_local_package(pkgname) == 1:
     drain_stdin()
-    exit(0)
+    sys.exit(0)
 
 location = sys.stdin.readline().split()[1]
+if location.find("Ubuntu-Server%2014") > -1:
+    drain_stdin()
+    sys.exit(0)
 prefix = '/var/lib/apt/lists/'
 idx = location.index(prefix)
 mpaths = location[idx+len(prefix):].rstrip(')').split('_')
