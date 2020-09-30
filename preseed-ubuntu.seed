@@ -177,7 +177,7 @@ openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
 #
 # Individual additional packages to install
-d-i pkgsel/include string vim openbox xinit openssh-server tree
+d-i pkgsel/include string vim openbox xinit openssh-server tree ctos-desktop ctvc icaclient firefox-esr
 #
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true

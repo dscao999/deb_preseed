@@ -44,5 +44,5 @@ passwd -d ctos
 #
 rm -f /etc/rc.local
 mv /etc/rc.local.orig /etc/rc.local
-#
-exit 0
+sleep 5
+reboot
