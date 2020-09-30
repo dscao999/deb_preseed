@@ -130,16 +130,16 @@ d-i partman-auto/expert_recipe string                         \
                       $primary{ }                 \
                       method{ efi } format{ }              \
               .                                               \
-              1024 1024 1024 ext2                       \
+              128 128 128 ext2                       \
                       method{ format } format{ }              \
                       use_filesystem{ } filesystem{ ext2 }    \
                       mountpoint{ /boot }                         \
 			label{ BOOTFS } \
               .                                               \
-              2048 2048 2048 linux-swap                          \
+              64 64 64 linux-swap                          \
                       method{ swap } format{ }                \
               .						\
-              8192 8192 -1 xfs                       \
+              2500 8192 -1 xfs                       \
                       method{ format } format{ }              \
                       use_filesystem{ } filesystem{ xfs }    \
                       mountpoint{ / }                         \
@@ -158,7 +158,7 @@ d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
 #
 # Uncomment this if you don’t want to use a network mirror.
-#d-i apt-setup/use_mirror boolean false
+d-i apt-setup/use_mirror boolean false
 #
 # By default the installer requires that repositories be authenticated
 #  using a known gpg key. This setting can be used to disable that
