@@ -70,11 +70,11 @@ d-i time/zone string Asia/Shanghai
 # Controls whether to use NTP to set the clock during the install
 d-i clock-setup/ntp boolean true
 # NTP server to use. The default is almost always fine here.
-#d-i clock-setup/ntp-server string ntp.example.com
+d-i clock-setup/ntp-server string hk.pool.ntp.org
 #
 
 # for internal use; can be preseeded
-apt-setup-udeb apt-setup/security_host string mirrors.tuna.tsinghua.edu.cn
+apt-setup-udeb apt-setup/security_host string
 #
 # Would you like to make this partition active?
 # for internal use; can be preseeded
@@ -99,8 +99,8 @@ d-i  base-installer/kernel/altmeta   string lts-xenial
 #
 # disk partition operations
 #
-#partman-auto    partman-auto/disk        string /dev/sda
-partman-auto    partman-auto/select_disk        select /dev/sda /dev/vda
+partman-auto    partman-auto/disk        string /dev/sda
+#partman-auto    partman-auto/select_disk        select /dev/sda /dev/vda
 #d-i partman-auto/disk string /dev/vda
 # In addition, you’ll need to specify the method to use.
 # The presently available methods are:
@@ -122,28 +122,29 @@ d-i partman-md/device_remove_md boolean true
 d-i partman-lvm/confirm boolean true
 d-i partman-lvm/confirm_nooverwrite boolean true
 #
-#d-i partman-auto/choose_recipe select boot-root
+d-i partman-auto/choose_recipe select boot-root
 #
-d-i partman-auto/expert_recipe string                         \
-      boot-root ::                                            \
-              64 64 64 fat16                                  \
-                      $primary{ }                 \
-                      method{ efi } format{ }              \
-              .                                               \
-              128 128 128 ext2                       \
-                      method{ format } format{ }              \
-                      use_filesystem{ } filesystem{ ext2 }    \
-                      mountpoint{ /boot }                         \
-			label{ BOOTFS } \
-              .                                               \
-              64 64 64 linux-swap                          \
-                      method{ swap } format{ }                \
-              .						\
-              2500 8192 -1 xfs                       \
-                      method{ format } format{ }              \
-                      use_filesystem{ } filesystem{ xfs }    \
-                      mountpoint{ / }                         \
-			label{ ROOTFS } \
+d-i partman-auto/expert_recipe string				\
+      boot-root ::						\
+              64 64 64 fat16					\
+                      $primary{ }				\
+                      method{ efi } format{ }			\
+              .							\
+              128 128 128 ext2					\
+			$primary{ }				\
+                      method{ format } format{ }		\
+                      use_filesystem{ } filesystem{ ext2 }	\
+                      mountpoint{ /boot }			\
+			label{ BOOTFS }				\
+              .							\
+              64 64 64 linux-swap				\
+                      method{ swap } format{ }			\
+              .							\
+              2500 8192 -1 xfs					\
+                      method{ format } format{ }		\
+                      use_filesystem{ } filesystem{ xfs }	\
+                      mountpoint{ / }				\
+			label{ ROOTFS }				\
               .
 # The full recipe format is documented in the file partman-auto-recipe.txt
 # included in the 'debian-installer' package or available from D-I source
@@ -177,7 +178,9 @@ openssh-server  openssh-server/permit-root-login        boolean false
 pkgsel  pkgsel/update-policy    select none
 #
 # Individual additional packages to install
-d-i pkgsel/include string vim openbox xinit openssh-server tree ctos-desktop ctvc icaclient firefox-esr
+d-i pkgsel/include string vim openssh-server tree openbox xinit \
+	ctos-desktop ctvc icaclient firefox-esr
+#	ctos-login-ui ctos-connect-manager ctos-control-center \
 #
 # Download language support?
 pkgsel  pkgsel/install-language-support boolean true

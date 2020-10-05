@@ -35,12 +35,41 @@ then
 fi
 if [ -f /etc/default/grub ]
 then
-	sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*$/GRUB_CMDLINE_LINUX_DEFAULT=/' /etc/default/grub
+	ckey="GRUB_CMDLINE_LINUX_DEFAULT"
+	con1="console=ttyS0,115200n8"
+	con2="console=tty"
+	sedscript="s/^${ckey}=.*$/${ckey}=\"${con1} ${con2}\"/"
+	sed -i -e "${sedscript}" /etc/default/grub
 	update-grub
 fi
 #
 useradd -c "Default User, Automatic Login" -m ctos
 passwd -d ctos
+while [ ! -f /home/ctos/.bashrc ]
+do
+	sleep 1
+done
+sleep 1
+cat >> /home/ctos/.bashrc <<"ENDDOC"
+export LANG="zh_CN.UTF-8"
+export LANGUAGE="zh_CN:zh"
+#
+#auto start X on startup
+#
+if [ x"$FROM_UPSTART" = x"yes" ]; then
+	export FROM_UPSTART=
+	TTY=${TTY:-$(tty)}
+	TTY=${TTY#/dev/}
+
+	if [[ $TTY != tty* ]]; then
+		printf '==> ERROR: invalid TTY\n' >&2
+		exit 1
+	fi
+	printf -v vt 'vt%02d' "${TTY#tty}"
+	clear
+	exec startx -- -keeptty $vt > /dev/null 2>&1
+fi
+ENDDOC
 #
 rm -f /etc/rc.local
 mv /etc/rc.local.orig /etc/rc.local
