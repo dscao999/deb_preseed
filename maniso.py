@@ -52,6 +52,67 @@ def parse_preseed(rootdev, clock_setup, time_svr):
         line = inf.readline()
     inf.close()
 
+class RootDev_Disp(tk.Frame):
+    def __init__(self, parent, rootdev):
+        super().__init__(parent)
+        uf = tk.Frame(self)
+        uf.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
+        rdev_label = tk.Label(uf, text="root device:", font=mfont)
+        rdev_label.pack(side=tk.LEFT)
+        self.rdev_text = tk.Entry(uf, font=mfont)
+        self.rdev_text.insert(0, rootdev)
+        self.rdev_text.pack(side=tk.RIGHT)
+        lf = tk.Frame(self, height=2, bd=1, bg='red', relief=tk.SUNKEN)
+        lf.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+
+    def pack(self, **kargs):
+        super().pack(**kargs)
+
+    def get_rootdev(self):
+        return self.rdev_text.get()
+
+class ClockSet_Disp(tk.Frame):
+    def __init__(self, parent, settm, ntpip):
+        super().__init__(parent)
+        self.ntpip = ntpip
+        self.set_clock = tk.IntVar()
+        if settm:
+            self.set_clock.set(1)
+        else:
+            self.set_clock.set(0)
+        chk_clock = tk.Checkbutton(self, text="Set Clock", variable=self.set_clock,
+                font=mfont, command=self.clock_check)
+        chk_clock.pack()
+        lf = tk.Frame(self)
+        lf.pack(fill=tk.X, expand=tk.YES)
+        ntp_label = tk.Label(lf, text="NTP Server:", font=mfont)
+        ntp_label.pack(side=tk.LEFT)
+        self.ntp_ip = tk.Entry(lf, font=mfont)
+        if self.set_clock.get() == 1:
+            self.ntp_ip.insert(0, time_svr)
+        else:
+            self.ntp_ip.config(state='disabled')
+        self.ntp_ip.pack(side=tk.RIGHT)
+        lf = tk.Frame(self, height=2, bd=1, bg='red', relief=tk.SUNKEN)
+        lf.pack(fill=tk.X, padx=5, pady=5)
+
+    def pack(self, **kargs):
+        super().pack(**kargs)
+
+    def clock_check(self):
+        chk = self.set_clock.get()
+        if chk == 1:
+            self.ntp_ip.config(state='normal')
+        else:
+            self.ntp_ip.config(state='disabled')
+
+    def get_clock_set(self):
+        chk = self.set_clock.get()
+        if chk == 0:
+            return ''
+        else:
+            return self.ntp_ip.get()
+
 if len(sys.argv) < 2:
     print("Error: An LIOS ISO mount point must be specified.")
     sys.exit(5)
@@ -79,43 +140,11 @@ root = tk.Tk()
 #root.title(sys.argv[0])
 root.wm_title(sys.argv[0])
 
-uf = tk.Frame(root)
-uf.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
-u_uf = tk.Frame(uf)
-u_uf.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
-rdev_label = tk.Label(u_uf, text="root device:", font=mfont)
-rdev_label.pack(side=tk.LEFT)
-rdev_text = tk.Entry(u_uf, font=mfont)
-rdev_text.insert(0, rootdev)
-rdev_text.pack(side=tk.RIGHT)
-l_uf = tk.Frame(uf)
-l_uf.pack(side=tk.BOTTOM, expand=tk.YES, fill=tk.X)
-border = tk.Frame(l_uf, height=2, bd=1, bg='red', relief=tk.SUNKEN)
-border.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+rdev_disp = RootDev_Disp(root, rootdev)
+rdev_disp.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
 
-lf = tk.Frame(root)
-lf.pack(side=tk.BOTTOM, expand=tk.YES, fill=tk.X)
-
-u_lf = tk.Frame(lf)
-set_clock = tk.IntVar()
-if clock_setup == True:
-    set_clock.set(1)
-else:
-    set_clock.set(0)
-chk_clock = tk.Checkbutton(u_lf, text="Set Clock", variable=set_clock, font=mfont)
-chk_clock.pack(side=tk.TOP)
-u_lf.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
-
-l_lf = tk.Frame(lf)
-ntp_label = tk.Label(l_lf, text="NTP Server:", font=mfont)
-ntp_label.pack(side=tk.LEFT)
-ntp_ip = tk.Entry(l_lf, font=mfont)
-if set_clock.get() == 1:
-    ntp_ip.insert(0, time_svr)
-else:
-    ntp_ip.config(state='disabled')
-ntp_ip.pack(side=tk.RIGHT)
-l_lf.pack(side=tk.BOTTOM, expand=tk.YES, fill=tk.X)
+clock_disp = ClockSet_Disp(root, clock_setup, time_svr)
+clock_disp.pack(side=tk.BOTTOM, expand=tk.YES, fill=tk.X)
 
 root.mainloop()
 
