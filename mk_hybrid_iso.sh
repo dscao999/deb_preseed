@@ -1,6 +1,6 @@
 ISODIR=isotop
 cp /usr/lib/ISOLINUX/isolinux.bin $ISODIR/isolinux/isolinux.bin
-xorriso -as mkisofs -r -V 'Lenovo_LIOS_V1_amd64' \
+xorriso -as mkisofs -r -V 'LENOVO_LIOS_V1_AMD64' \
 	-o hybrid_dvd.iso \
 	-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
 	-b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4 \

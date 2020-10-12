@@ -106,12 +106,34 @@ class ClockSet_Disp(tk.Frame):
         else:
             self.ntp_ip.config(state='disabled')
 
-    def get_clock_set(self):
+    def get_ntp_ip(self):
         chk = self.set_clock.get()
         if chk == 0:
             return ''
         else:
             return self.ntp_ip.get()
+
+class DebUpdate(tk.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.mlist = tk.Listbox(self, font=mfont)
+        self.mlist.pack(side=tk.RIGHT)
+        l_p = tk.Frame(self)
+        l_p.pack(side=tk.LEFT, fill=tk.X, expand=tk.YES)
+        self.add_button = tk.Button(l_p, text="Add>>", font=mfont, command=self.add_deb, width=12)
+        self.add_button.pack()
+        self.rmv_button = tk.Button(l_p, text="<<Remove", font=mfont, command=self.remove_deb, width=12)
+        self.rmv_button.pack()
+
+    def add_deb(self):
+        return
+
+    def remove_deb(self):
+        return
+
+    def pack(self, **kargs):
+        super().pack(**kargs)
+
 
 if len(sys.argv) < 2:
     print("Error: An LIOS ISO mount point must be specified.")
@@ -141,10 +163,13 @@ root = tk.Tk()
 root.wm_title(sys.argv[0])
 
 rdev_disp = RootDev_Disp(root, rootdev)
-rdev_disp.pack(side=tk.TOP, expand=tk.YES, fill=tk.X)
+rdev_disp.pack(expand=tk.YES, fill=tk.X)
 
 clock_disp = ClockSet_Disp(root, clock_setup, time_svr)
-clock_disp.pack(side=tk.BOTTOM, expand=tk.YES, fill=tk.X)
+clock_disp.pack(expand=tk.YES, fill=tk.X)
+
+deb_update = DebUpdate(root)
+deb_update.pack(expand=tk.YES, fill=tk.X)
 
 root.mainloop()
 
