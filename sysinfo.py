@@ -8,9 +8,29 @@ import gettext
 _ = gettext.gettext
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, GLib, GObject
 
 import os.path
+
+import time
+import threading
+from datetime import datetime
+
+class MDateTime(threading.Thread):
+    def __init__(self, win):
+        super().__init__()
+        self.now = datetime.now()
+        self.win = win
+        self.stop = 0
+
+    def run(self):
+        while self.stop == 0:
+            time.sleep(1)
+            self.now = datetime.now()
+            GLib.idle_add(self.win.refresh_clock, self.now.ctime())
+
+    def ok_done(self):
+        self.stop = 1
 
 host_name_file = '/etc/hostname'
 os_file = '/etc/os-release'
@@ -131,7 +151,7 @@ class SYSInfo:
 class MWindow(Gtk.Window):
     def __init__(self, sysinfo):
         super().__init__()
-        self.set_border_width(10)
+        self.set_border_width(2)
         self.set_default_size(400, 200)
 
         hb = Gtk.HeaderBar()
@@ -139,11 +159,11 @@ class MWindow(Gtk.Window):
         hb.props.title = _("System Info")
         self.set_titlebar(hb)
 
-        self.grid = Gtk.Grid()
-        self.add(self.grid)
+        grid = Gtk.Grid()
+        self.add(grid)
 
         hbox1 = Gtk.Box(homogeneous=False)
-        self.grid.attach(hbox1, 0, 0, 2, 1)
+        grid.attach(hbox1, 0, 0, 2, 1)
         hname_label = Gtk.Label(label=_("Hostname: "))
         hname_label.set_width_chars(13)
         hbox1.pack_start(hname_label, False, True, 0)
@@ -153,7 +173,7 @@ class MWindow(Gtk.Window):
 #        hname_content.set_justify(Gtk.Justification.LEFT)
 
         hbox2 = Gtk.Box(homogeneous=False)
-        self.grid.attach(hbox2, 0, 1, 2, 1)
+        grid.attach(hbox2, 0, 1, 2, 1)
         os_label = Gtk.Label(label=_("OS Type: "))
         os_label.set_width_chars(13)
         hbox2.pack_start(os_label, False, False, 0)
@@ -162,19 +182,26 @@ class MWindow(Gtk.Window):
         hbox2.pack_start(os_name, True, True, 0)
 
         hbox3 = Gtk.Box(homogeneous=False)
-        self.grid.attach(hbox3, 0, 2, 2, 1)
+        grid.attach(hbox3, 0, 2, 2, 1)
         mem_label = Gtk.Label(label=_("Memory Size: "))
         mem_label.set_width_chars(13)
         hbox3.pack_start(mem_label, False, True, 0)
         mem_size = Gtk.Entry(text=sysinfo.memsize)
         mem_size.set_editable(False)
-        hbox3.pack_start(mem_size, True, True, 0)
+        mem_size.set_width_chars(8)
+        hbox3.pack_start(mem_size, False, True, 0)
+        date_label = Gtk.Label(label=_("Date Time: "))
+        hbox3.pack_start(date_label, False, True, 10)
+        self.date_disp = Gtk.Entry(text=datetime.now().ctime())
+        self.date_disp.set_editable(False)
+        self.date_disp.set_width_chars(10)
+        hbox3.pack_start(self.date_disp, True, True, 0)
 
         hseparator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        self.grid.attach(hseparator, 0, 3, 2, 1)
+        grid.attach(hseparator, 0, 3, 2, 1)
 
         vbox = Gtk.VBox()
-        self.grid.attach(vbox, 1, 4, 1, 1)
+        grid.attach(vbox, 1, 4, 1, 1)
         hbox = Gtk.Box()
         vbox.pack_start(hbox, True, True, 1)
 
@@ -199,32 +226,34 @@ class MWindow(Gtk.Window):
             ih += 1
 
         hseparator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        self.grid.attach(hseparator, 0, 4+ih, 2, 1)
+        grid.attach(hseparator, 0, 4+ih, 2, 1)
 
         img = Gtk.Image()
         img.set_from_file("./sysinfo-side.png")
-        self.grid.attach(img, 0, 4, 1, ih+2)
+        grid.attach(img, 0, 4, 1, ih+2)
 
         ver = Gtk.Label(label=_("Version: "))
-        self.grid.attach(ver, 0, 6+ih, 1, 1)
+        grid.attach(ver, 0, 6+ih, 1, 1)
         lic = Gtk.Label(label=_("LIDC Connector v3.7"))
-        self.grid.attach(lic, 1, 6+ih, 1, 1)
+        grid.attach(lic, 1, 6+ih, 1, 1)
 
         self.set_position(Gtk.WindowPosition.CENTER)
 
-if __name__ == '__main__':
-    print("Host Name: {}".format(hostname()))
-    osn = osname()
-    print("OS: {}".format(osn))
-    print("Memory Size: {}GiB".format(memsize()))
-    cpuinfos = cpuinfo()
-    for cpu in cpuinfos:
-        print("Number of CPU: {} Type: {}".format(cpu[1], cpu[0]))
+    def refresh_clock(self, dt):
+        self.date_disp.set_text(dt)
 
+if __name__ == '__main__':
     minfo = SYSInfo()
     win = MWindow(minfo)
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
+
+    watch = MDateTime(win)
+    watch.start()
+
     Gtk.main()
+
+    watch.ok_done()
+    watch.join()
 
     sys.exit(0)
