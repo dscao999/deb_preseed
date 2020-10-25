@@ -8,7 +8,7 @@ import gettext
 _ = gettext.gettext
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib, GObject
+from gi.repository import Gtk, GLib
 
 import os.path
 
@@ -36,6 +36,31 @@ host_name_file = '/etc/hostname'
 os_file = '/etc/os-release'
 mem_file = '/proc/meminfo'
 cpu_file = '/proc/cpuinfo'
+net_dir = '/sys/class/net/'
+
+def netinfo():
+    netports = []
+    for netlink in os.listdir(net_dir):
+        netport = os.path.realpath(net_dir+netlink)
+        if netport.find('virtual') > -1:
+            continue
+
+        wired = 1
+        mack = ' '
+        upl = 0
+        for prop in os.listdir(netport):
+            if prop == 'wireless':
+                wired = 0
+            if prop == 'address':
+                with open(netport+'/address', 'r') as fin:
+                    mac = fin.readline().rstrip('\n')
+            if prop == 'operstate':
+                with open(netport+'/operstate', 'r') as fin:
+                    updown = fin.readline().rstrip('\n')
+                    if updown == 'up':
+                        upl = 1
+        netports.append((os.path.basename(netport), mac, wired, upl))
+    return netports
 
 def hostname():
     if not os.path.isfile(host_name_file):
@@ -147,6 +172,7 @@ class SYSInfo:
         self.osname = osname()
         self.memsize = str(memsize())+' GiB'
         self.cpuinfo = cpuinfo()
+        self.netinfo = netinfo()
 
 class MWindow(Gtk.Window):
     def __init__(self, sysinfo):
@@ -200,8 +226,63 @@ class MWindow(Gtk.Window):
         hseparator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         grid.attach(hseparator, 0, 3, 2, 1)
 
+        nrow = 4
         vbox = Gtk.VBox()
-        grid.attach(vbox, 1, 4, 1, 1)
+        grid.attach(vbox, 0, nrow, 3, 1)
+        hbox = Gtk.Box(homogeneous=False)
+        vbox.pack_start(hbox, True, True, 0)
+
+        nic_label = Gtk.Label(_("Nic Port"))
+        nic_label.set_width_chars(8)
+        hbox.pack_start(nic_label, False, True, 0)
+        mac_label = Gtk.Label(_("Mac Addr"))
+        hbox.pack_start(mac_label, True, True, 16)
+        wir_label = Gtk.Label(_("WIFI"))
+        hbox.pack_start(wir_label, False, True, 20)
+        upd_label = Gtk.Label(_("Up/Down"))
+        hbox.pack_start(upd_label, False, True, 30)
+        ip_label = Gtk.Label(_("IP Addr"))
+        hbox.pack_start(ip_label, True, True, 1)
+
+        nrow += 1
+
+        for nic, mac, wired, updown in sysinfo.netinfo:
+            hbox = Gtk.Box(homogeneous=False)
+            vbox.pack_start(hbox, True, True, 0)
+
+            nic_label = Gtk.Entry(text=nic)
+            nic_label.set_width_chars(8)
+            nic_label.set_editable(False)
+            hbox.pack_start(nic_label, False, True, 0)
+            mac_label = Gtk.Entry(text=mac)
+            mac_label.set_width_chars(16)
+            mac_label.set_editable(False)
+            hbox.pack_start(mac_label, False, True, 0)
+            wir_label = Gtk.Entry()
+            wir_label.set_width_chars(6)
+            wir_label.set_editable(False)
+            hbox.pack_start(wir_label, False, True, 0)
+            if wired == 1:
+                wir_label.set_text(_("Wired"))
+            else:
+                wir_label.set_text(_("Wifi"))
+            upd_label = Gtk.Entry()
+            upd_label.set_width_chars(6)
+            upd_label.set_editable(False)
+            hbox.pack_start(upd_label, False, True, 0)
+            if updown == 1:
+                upd_label.set_text(_("Up"))
+            else:
+                upd_label.set_text(_("Down"))
+            nrow += 1
+
+        hseparator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        grid.attach(hseparator, 0, nrow+1, 2, 1)
+
+
+        nrow = 5
+        vbox = Gtk.VBox()
+        grid.attach(vbox, 1, nrow, 1, 1)
         hbox = Gtk.Box()
         vbox.pack_start(hbox, True, True, 1)
 
@@ -226,16 +307,16 @@ class MWindow(Gtk.Window):
             ih += 1
 
         hseparator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        grid.attach(hseparator, 0, 4+ih, 2, 1)
+        grid.attach(hseparator, 0, nrow+ih, 2, 1)
 
         img = Gtk.Image()
         img.set_from_file("./sysinfo-side.png")
-        grid.attach(img, 0, 4, 1, ih+2)
+        grid.attach(img, 0, nrow, 1, ih+2)
 
         ver = Gtk.Label(label=_("Version: "))
-        grid.attach(ver, 0, 6+ih, 1, 1)
+        grid.attach(ver, 0, nrow+2+ih, 1, 1)
         lic = Gtk.Label(label=_("LIDC Connector v3.7"))
-        grid.attach(lic, 1, 6+ih, 1, 1)
+        grid.attach(lic, 1, nrow+2+ih, 1, 1)
 
         self.set_position(Gtk.WindowPosition.CENTER)
 
@@ -243,6 +324,7 @@ class MWindow(Gtk.Window):
         self.date_disp.set_text(dt)
 
 if __name__ == '__main__':
+    netinfo()
     minfo = SYSInfo()
     win = MWindow(minfo)
     win.connect("destroy", Gtk.main_quit)
