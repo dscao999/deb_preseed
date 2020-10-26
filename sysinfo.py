@@ -241,7 +241,7 @@ class MWindow(Gtk.Window):
         wir_label = Gtk.Label(_("WIFI"))
         hbox.pack_start(wir_label, False, True, 0)
         upd_label = Gtk.Label(_("Up/Down"))
-        hbox.pack_start(upd_label, False, True, 20)
+        hbox.pack_start(upd_label, False, True, 15)
         ip_label = Gtk.Label(_("IP Address"))
         hbox.pack_start(ip_label, True, True, 1)
 
