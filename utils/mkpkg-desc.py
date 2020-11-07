@@ -21,6 +21,12 @@ if not os.path.isdir(suite):
 binarch = suite + 'main/binary-arm64/'
 if not os.path.isdir(binarch):
     os.makedirs(binarch)
+byhash = binarch + "by-hash/MD5Sum/"
+if not os.path.isdir(byhash):
+    os.makedirs(byhash)
+byhash = binarch + "by-hash/SHA256/"
+if not os.path.isdir(byhash):
+    os.makedirs(byhash)
 pool = topdir + 'pool/lenovo/'
 if not os.path.isdir(pool):
     os.makedirs(pool)
@@ -106,44 +112,76 @@ Description: VDI Components for LIOS"""
 
 with open(binarch + "Release", "w") as fo:
     fo.write(binrel)
+mp = len(suite)
 with open(suite + "Release", "w") as fo:
     fo.write(dstrel)
 
+    byhash = binarch + "by-hash/MD5Sum/"
     fo.write("MD5Sum:\n")
     pkgname = pkg
     fsize = os.path.getsize(pkgname)
-    mp = len(suite)
-    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'md5')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = pkg + ".gz"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'md5')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = pkg + ".xz"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'md5')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = binarch + "Release"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'md5')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
 
+    byhash = binarch + "by-hash/SHA256/"
     fo.write("SHA256:\n")
     pkgname = pkg
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'sha256')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = pkg + ".gz"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'sha256')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = pkg + ".xz"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'sha256')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
+
     pkgname = binarch + "Release"
     fsize = os.path.getsize(pkgname)
-    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
-            + pkgname[mp:] + '\n')
+    hashv = hash_file(pkgname, 'sha256')
+    fo.write(" " + hashv + ' ' + str(fsize) + ' ' + pkgname[mp:] + '\n')
+    with open(pkgname, "rb") as ufin:
+        with open(byhash + hashv, "wb") as ufo:
+            shutil.copyfileobj(ufin, ufo)
 
 sys.exit(0)
