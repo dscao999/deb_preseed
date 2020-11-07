@@ -5,11 +5,30 @@ import hashlib
 import gzip, lzma
 import shutil
 
-fout = open("/tmp/Packages", "w")
+if len(sys.argv) > 1:
+    topdir = sys.argv[1]
+    if topdir[-1] != '/':
+        topdir = topdir + '/'
+else:
+    topdir = '/var/debmirror/lenvdi/'
+if not os.path.isdir(topdir):
+    print("DEB Dir not found: {}".format(topdir))
+    sys.exit(1)
 
-debsink = "/tmp/pool/lenovo"
-if not os.path.isdir(debsink):
-    os.makedirs(debsink)
+suite = topdir + 'dists/orca/'
+if not os.path.isdir(suite):
+    os.makedirs(suite)
+binarch = suite + 'main/binary-arm64/'
+if not os.path.isdir(binarch):
+    os.makedirs(binarch)
+pool = topdir + 'pool/lenovo/'
+if not os.path.isdir(pool):
+    os.makedirs(pool)
+
+rel = suite + 'Release'
+pkg = binarch + 'Packages'
+fout = open(pkg, "w")
+
 dents = os.listdir(".")
 for dent in dents:
     if not os.path.isfile(dent):
@@ -31,10 +50,10 @@ for dent in dents:
                 afd = True
 
     fout.write('Priority: required\n')
-    debf = 'pool/lenovo/' + dent
+    debf = pool + dent
     fout.write('Filename: ' + debf +'\n')
     fout.write('Size: '+str(os.path.getsize(dent))+'\n')
-    debo = open('/tmp/' + debf, 'wb')
+    debo = open(debf, 'wb')
     md5 = hashlib.new('md5')
     sha = hashlib.new('sha256')
     with open(dent, 'rb') as debin:
@@ -51,11 +70,11 @@ for dent in dents:
 
 fout.close()
 
-with open("/tmp/Packages", 'rb') as f_in:
-    with gzip.open("/tmp/Packages.gz", 'wb') as gz_out:
+with open(pkg, 'rb') as f_in:
+    with gzip.open(pkg+".gz", 'wb') as gz_out:
         shutil.copyfileobj(f_in, gz_out);
     f_in.seek(0)
-    with lzma.open("/tmp/Packages.xz", 'wb') as xz_out:
+    with lzma.open(pkg+".xz", 'wb') as xz_out:
         shutil.copyfileobj(f_in, xz_out);
 
 def hash_file(fname, hshname):
@@ -67,26 +86,64 @@ def hash_file(fname, hshname):
             sl = f_in.read(8192)
     return hsh.hexdigest()
 
-print("MD5Sum:")
-pkgname = "/tmp/Packages"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'md5') + ' {} {}').format(fsize, pkgname))
-pkgname = "/tmp/Packages.gz"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'md5') + ' {} {}').format(fsize, pkgname))
-pkgname = "/tmp/Packages.xz"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'md5') + ' {} {}').format(fsize, pkgname))
+binrel = """Archive: orca
+Origin: Lenovo
+Label: Lenovo
+Version: 0.11
+Acquire-By-Hash: yes
+Component: main
+Architecture: arm64"""
 
-print("SHA256:")
-pkgname = "/tmp/Packages"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'sha256') + ' {} {}').format(fsize, pkgname))
-pkgname = "/tmp/Packages.gz"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'sha256') + ' {} {}').format(fsize, pkgname))
-pkgname = "/tmp/Packages.xz"
-fsize = os.path.getsize(pkgname)
-print((" " + hash_file(pkgname, 'sha256') + ' {} {}').format(fsize, pkgname))
+dstrel = """Origin: Lenovo
+Label: Lenovo
+Suite: orca
+Codename: orca
+Date: Wed, 04 Nov 2020 20:15:10 UTC
+Valid-Until: Wed, 11 Nov 2020 20:15:10 UTC
+Architectures: arm64
+Components: main
+Description: VDI Components for LIOS"""
+
+with open(binarch + "Release", "w") as fo:
+    fo.write(binrel)
+with open(suite + "Release", "w") as fo:
+    fo.write(dstrel)
+
+    fo.write("MD5Sum:\n")
+    pkgname = pkg
+    fsize = os.path.getsize(pkgname)
+    mp = len(suite)
+    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = pkg + ".gz"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = pkg + ".xz"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = binarch + "Release"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'md5') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+
+    fo.write("SHA256:\n")
+    pkgname = pkg
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = pkg + ".gz"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = pkg + ".xz"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
+    pkgname = binarch + "Release"
+    fsize = os.path.getsize(pkgname)
+    fo.write(" " + hash_file(pkgname, 'sha256') + ' ' + str(fsize) + ' '
+            + pkgname[mp:] + '\n')
 
 sys.exit(0)
