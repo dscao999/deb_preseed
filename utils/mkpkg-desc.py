@@ -15,7 +15,13 @@ if not os.path.isdir(topdir):
     print("DEB Dir not found: {}".format(topdir))
     sys.exit(1)
 
-suite = topdir + 'dists/orca/'
+nick = 'orca/'
+if len(sys.argv) > 2:
+    nick = sys.argv[2]
+    if nick[-1] != '/':
+        nick = nick + '/'
+
+suite = topdir + 'dists/' + nick
 if not os.path.isdir(suite):
     os.makedirs(suite)
 binarch = suite + 'main/binary-arm64/'
@@ -111,10 +117,10 @@ Components: main
 Description: VDI Components for LIOS"""
 
 with open(binarch + "Release", "w") as fo:
-    fo.write(binrel)
+    fo.write(binrel.replace('orca', nick[:-1]))
 mp = len(suite)
 with open(suite + "Release", "w") as fo:
-    fo.write(dstrel)
+    fo.write(dstrel.replace('orca', nick[:-1]))
 
     byhash = binarch + "by-hash/MD5Sum/"
     fo.write("MD5Sum:\n")
