@@ -104,7 +104,7 @@ def hash_file(fname, hshname):
 binrel = """Archive: orca
 Origin: Lenovo
 Label: Lenovo
-Version: 0.11
+Version: vernum
 Acquire-By-Hash: yes
 Component: main
 Architecture: arm64"""
@@ -120,7 +120,7 @@ Components: main
 Description: VDI Components for LIOS"""
 
 with open(binarch + "Release", "w") as fo:
-    fo.write(binrel.replace('orca', nick[:-1]).replace('0.11', vernum))
+    fo.write(binrel.replace('orca', nick[:-1]).replace('vernum', vernum))
 mp = len(suite)
 with open(suite + "Release", "w") as fo:
     fo.write(dstrel.replace('orca', nick[:-1]))
