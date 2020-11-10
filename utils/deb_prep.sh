@@ -40,7 +40,7 @@ case "$action" in
 "build-deb")
 	for debdir in $(ls -ld *|grep -E '^dr'|awk '{print $9}')
 	do
-		debfile=$(ls ${debdir}*.deb)
+		debfile=$(ls ${debdir}_*.deb)
 		[ -f $debfile ] || continue
 		echo build deb: $debfile
 		dpkg-deb --build $debdir $debfile

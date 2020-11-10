@@ -16,10 +16,13 @@ if not os.path.isdir(topdir):
     sys.exit(1)
 
 nick = 'orca/'
+vernum = '0.11'
 if len(sys.argv) > 2:
     nick = sys.argv[2]
     if nick[-1] != '/':
         nick = nick + '/'
+    if len(sys.argv) > 3:
+        vernum = sys.argv[3]
 
 suite = topdir + 'dists/' + nick
 if not os.path.isdir(suite):
@@ -63,7 +66,7 @@ for dent in dents:
 
     fout.write('Priority: required\n')
     debf = pool + dent
-    fout.write('Filename: ' + debf +'\n')
+    fout.write('Filename: ' + 'pool/lenovo/' + dent +'\n')
     fout.write('Size: '+str(os.path.getsize(dent))+'\n')
     debo = open(debf, 'wb')
     md5 = hashlib.new('md5')
@@ -117,13 +120,13 @@ Components: main
 Description: VDI Components for LIOS"""
 
 with open(binarch + "Release", "w") as fo:
-    fo.write(binrel.replace('orca', nick[:-1]))
+    fo.write(binrel.replace('orca', nick[:-1]).replace('0.11', vernum))
 mp = len(suite)
 with open(suite + "Release", "w") as fo:
     fo.write(dstrel.replace('orca', nick[:-1]))
 
     byhash = binarch + "by-hash/MD5Sum/"
-    fo.write("MD5Sum:\n")
+    fo.write("\nMD5Sum:\n")
     pkgname = pkg
     fsize = os.path.getsize(pkgname)
     hashv = hash_file(pkgname, 'md5')
