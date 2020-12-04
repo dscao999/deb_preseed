@@ -1,5 +1,5 @@
 title-color: "white"
-title-text: "Debian GNU/Linux 10.6.0"
+title-text: "Lenovo LIOS 2.0"
 title-font: "Sans Regular 16"
 desktop-color: "black"
 desktop-image: "/isolinux/splash.png"
@@ -14,7 +14,7 @@ terminal-font: "Sans Regular 12"
   height = 100
   + hbox {
     left = 0
-    + label {text = "Debian GNU/Linux UEFI Installer menu" font = "Sans 10" color = "#c0c0c0" align = "left"}
+    + label {text = "Lenovo LIOS 2.0 UEFI Installer menu" font = "Sans 10" color = "#c0c0c0" align = "left"}
   }
 }
 
