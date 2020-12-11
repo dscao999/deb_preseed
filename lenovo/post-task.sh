@@ -1,134 +1,70 @@
 #!/bin/sh -e
 #
 TARGET=/target
-sed -e '$aset -o vi' -i $TARGET/etc/profile
-if [ ! -d $TARGET/init ] 
+[ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
+[ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/skel/.bashrc
+if [ -f $TARGET/etc/default/grub ]
 then
-	echo "$TARGET/init does not exit"
-else
-	echo "$TARGET/init exists"
+	ckey="GRUB_CMDLINE_LINUX_DEFAULT"
+	cval="console=ttyS0,115200n8 splash"
+	seds1="s/^${ckey}=.*$/${ckey}=\"${cval}\"/"
+	sed -i -e "$seds1" $TARGET/etc/default/grub
 fi
-if [ ! -f $TARGET/etc/rc.local ]
+firmfile=/cdrom/lenovo/i915-firmware.tar.xz
+if [ -f $firmfile ]
 then
-	echo "$TARGET/etc/rc.local does not exit"
-	exit 0
-else
-	echo "$TARGET/etc/rc.local exits"
+	unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
 fi
+xfce_def=/cdrom/lenovo/default-desktop.tar.xz
+xfce_empty=/cdrom/lenovo/empty-desktop.tar.xz
+if [ -f $xfce_def -a -d $TARGET/home/lenovo ]
+then
+	[ -f $xfce_empty ] && cp $xfce_empty $TARGET/home/lenovo
+	cp $xfce_def $TARGET/home/lenovo
+fi
+endline=33
 #
-endline=27
-#
-mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
+[ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
 tail -n +${endline} $0 > $TARGET/etc/rc.local
 chmod +x $TARGET/etc/rc.local
 exit 0
-END OF SCRIPT
+#END OF SCRIPT
 #!/bin/bash -e
 #
 # one time task after installation
 #
-if [ -f /etc/init/tty1.conf ]
-then
-	cp /etc/init/tty1.conf /etc/init/ttyS0.conf
-	sed -i -e 's/tty1/ttyS0/g' -e 's/38400/115200/' /etc/init/ttyS0.conf
-fi
-if [ -f /etc/default/grub ]
-then
-	ckey="GRUB_CMDLINE_LINUX_DEFAULT"
-	con1="console=ttyS0,115200n8"
-	con2="console=tty"
-	sedscript="s/^${ckey}=.*$/${ckey}=\"${con1} ${con2}\"/"
-	sed -i -e "${sedscript}" /etc/default/grub
-	update-grub
-fi
+update-grub
 #
-useradd -c "Default User, Automatic Login" -m ctos
-passwd -d ctos
-while [ ! -f /home/ctos/.bashrc ]
+su -c "unxz -c /home/lenovo/default-desktop.tar.xz | tar -xf -" - lenovo
+#
+auto_user=liosuser
+useradd -c "Default User, Automatic Login" -m -s /usr/bin/bash $auto_user
+#
+while [ ! -d /home/$auto_user ]
 do
 	sleep 1
 done
-sleep 1
-cat >> /home/ctos/.bashrc <<"ENDDOC"
+#
+cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
 export LANG="zh_CN.UTF-8"
 export LANGUAGE="zh_CN:zh"
-#
-#auto start X on startup
-#
-if [ x"$FROM_UPSTART" = x"yes" ]; then
-	export FROM_UPSTART=
-	TTY=${TTY:-$(tty)}
-	TTY=${TTY#/dev/}
-
-	if [[ $TTY != tty* ]]; then
-		printf '==> ERROR: invalid TTY\n' >&2
-		exit 1
-	fi
-	printf -v vt 'vt%02d' "${TTY#tty}"
-	clear
-	exec startx -- -keeptty $vt > /dev/null 2>&1
-fi
+##
+##auto start lios proxy on startup
+##
 ENDDOC
 #
-# add auto-login for ctos
+chown ${auto_user}:${auto_user} .xsessionrc
 #
-cat >> /etc/init/autologin-ctos.conf <<"ENDDOC1"
+su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
 #
-# Autologin - Automatically login as ctos on tty7
-#
-# based on nodm
-
-description	"X starter"
-author		"Wang Shishuang <wangss@cloud-times.com>"
-
-start on ((filesystem and stopped rc
-           and runlevel [!06]
-           and started dbus
-           and (drm-device-added card0 PRIMARY_DEVICE_FOR_DISPLAY=1
-                or stopped udev-fallback-graphics))
-          or runlevel PREVLEVEL=S)
-
-stop on runlevel [016]
-
-respawn
-
-emits login-session-start
-emits desktop-session-start
-emits desktop-shutdown
-
-script
-    if [ -n "$UPSTART_EVENTS" ]
-    then
-        # Check kernel command-line for inhibitors, unless we are being called
-        # manually
-        for ARG in $(cat /proc/cmdline); do
-            if [ "$ARG" = "text" ]; then
-		plymouth quit || : 
-                stop
-		exit 0
-            fi
-        done
-
-	if [ "$RUNLEVEL" = S -o "$RUNLEVEL" = 1 ]
-	then
-	    # Single-user mode
-	    plymouth quit || :
-	    exit 0
-	fi
-    fi
-
-    exec /sbin/getty -8 38400 -o "-f \u FROM_UPSTART=yes" -a ctos tty7
-end script
-
-post-stop script
-	if [ "$UPSTART_STOP_EVENTS" = runlevel ]; then
-		initctl emit desktop-shutdown
-	fi
-end script
-ENDDOC1
-#
-rm -f /etc/rc.local
-mv /etc/rc.local.orig /etc/rc.local
+mv /etc/rc.local /etc/rc.local.once
+[ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
 sleep 5
-reboot
+sync
+target=$(systemctl get-default)
+while ! systemctl status $target | fgrep -i "reached target" > /dev/null 2>&1
+do
+	sleep 1
+done
+systemctl reboot
