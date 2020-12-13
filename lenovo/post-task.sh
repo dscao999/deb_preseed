@@ -1,8 +1,9 @@
 #!/bin/sh -e
 #
 TARGET=/target
-[ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
+[ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
 [ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/skel/.bashrc
+[ -f $TARGET/home/lenovo/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/home/lenovo/.bashrc
 if [ -f $TARGET/etc/default/grub ]
 then
 	ckey="GRUB_CMDLINE_LINUX_DEFAULT"
@@ -15,6 +16,8 @@ if [ -f $firmfile ]
 then
 	unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
 fi
+mkdir $TARGET/var/log/journal
+#
 xfce_def=/cdrom/lenovo/default-desktop.tar.xz
 xfce_empty=/cdrom/lenovo/empty-desktop.tar.xz
 if [ -f $xfce_def -a -d $TARGET/home/lenovo ]
@@ -22,7 +25,12 @@ then
 	[ -f $xfce_empty ] && cp $xfce_empty $TARGET/home/lenovo
 	cp $xfce_def $TARGET/home/lenovo
 fi
-endline=33
+#
+# Kill user processes after log out to avoid lingering processes, a bug of print applet
+#
+sed -i -e '/^#KillUserProcesses/aKillUserProcesses=yes' $TARGET/etc/systemd/logind.conf
+#
+endline=41
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -34,11 +42,19 @@ exit 0
 #
 # one time task after installation
 #
-update-grub
+exec 1> /home/lenovo/rc-local.log 2>&1
+#
+update-grub2
+auto_user=liosuser
+mkdir /etc/lightdm/lightdm.conf.d
+cat <<EOD > /etc/lightdm/lightdm.conf.d/01autologin.conf
+[Seat:*]
+autologin-user=$auto_user
+autologin-user-timeout=0
+EOD
 #
 su -c "unxz -c /home/lenovo/default-desktop.tar.xz | tar -xf -" - lenovo
 #
-auto_user=liosuser
 useradd -c "Default User, Automatic Login" -m -s /usr/bin/bash $auto_user
 #
 while [ ! -d /home/$auto_user ]
@@ -54,16 +70,15 @@ export LANGUAGE="zh_CN:zh"
 ##
 ENDDOC
 #
-chown ${auto_user}:${auto_user} .xsessionrc
+chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
 su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
 #
 mv /etc/rc.local /etc/rc.local.once
 [ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
-sleep 5
 sync
 target=$(systemctl get-default)
-while ! systemctl status $target | fgrep -i "reached target" > /dev/null 2>&1
+while ! loginctl --no-legend list-sessons | fgrep lightdm
 do
 	sleep 1
 done
