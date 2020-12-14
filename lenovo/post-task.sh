@@ -6,10 +6,13 @@ TARGET=/target
 [ -f $TARGET/home/lenovo/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/home/lenovo/.bashrc
 if [ -f $TARGET/etc/default/grub ]
 then
-	ckey="GRUB_CMDLINE_LINUX_DEFAULT"
-	cval="console=ttyS0,115200n8 splash"
-	seds1="s/^${ckey}=.*$/${ckey}=\"${cval}\"/"
-	sed -i -e "$seds1" $TARGET/etc/default/grub
+	ckey1="GRUB_DISTRIBUTOR"
+	cval1="LIOS V2"
+	seds1="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
+	ckey2="GRUB_CMDLINE_LINUX_DEFAULT"
+	cval2="console=ttyS0,115200n8 splash"
+	seds2="s/^${ckey1}=.*$/${ckey1}=\"${cval1}\"/"
+	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
 fi
 firmfile=/cdrom/lenovo/i915-firmware.tar.xz
 if [ -f $firmfile ]
@@ -30,7 +33,7 @@ fi
 #
 sed -i -e '/^#KillUserProcesses/aKillUserProcesses=yes' $TARGET/etc/systemd/logind.conf
 #
-endline=41
+endline=44
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -44,6 +47,7 @@ exit 0
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #
+update-initramfs -u
 update-grub2
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
@@ -68,6 +72,7 @@ export LANGUAGE="zh_CN:zh"
 ##
 ##auto start lios proxy on startup
 ##
+#  command
 ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
@@ -78,7 +83,7 @@ mv /etc/rc.local /etc/rc.local.once
 [ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
 sync
 target=$(systemctl get-default)
-while ! loginctl --no-legend list-sessons | fgrep lightdm
+while ! loginctl --no-legend list-sessions | fgrep lightdm
 do
 	sleep 1
 done
