@@ -8,10 +8,10 @@ if [ -f $TARGET/etc/default/grub ]
 then
 	ckey1="GRUB_DISTRIBUTOR"
 	cval1="LIOS V2"
-	seds1="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
+	seds1="s/^${ckey1}=.*$/${ckey1}=\"${cval1}\"/"
 	ckey2="GRUB_CMDLINE_LINUX_DEFAULT"
 	cval2="console=ttyS0,115200n8 splash"
-	seds2="s/^${ckey1}=.*$/${ckey1}=\"${cval1}\"/"
+	seds2="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
 	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
 fi
 firmfile=/cdrom/lenovo/i915-firmware.tar.xz
@@ -49,6 +49,7 @@ exec 1> /home/lenovo/rc-local.log 2>&1
 #
 update-initramfs -u
 update-grub2
+#
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
 cat <<EOD > /etc/lightdm/lightdm.conf.d/01autologin.conf
