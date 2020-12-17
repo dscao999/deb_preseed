@@ -73,7 +73,10 @@ export LANGUAGE="zh_CN:zh"
 ##
 ##auto start lios proxy on startup
 ##
-#  command
+if [ -x /usr/bin/lproxy ]
+then
+	nohup lproxy --no-quit >> lproxy.log 2>&1 &
+fi
 ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
