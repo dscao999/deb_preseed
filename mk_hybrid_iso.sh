@@ -83,11 +83,11 @@ done
 isofile=$1
 wdir=${PWD}
 [ "${rootdisk}" = "/dev/sda" ] && rootdisk=
-[ "${mirror}" = "ftp2.cn.debian.org" ] && mirror=
-[ -n "${rootdisk}" ] && srootdisk="s| /dev/sda$| ${rootdisk}|"
-[ -n "${mirror}" ] && shttphost="s| ftp2\\.cn\\.debian\\.org$| ${mirror}|"
+[ "${mirror}" = "mirrors.ustc.edu.cn" ] && mirror=
+[ -n "${rootdisk}" ] && srootdisk="s# /dev/sda\$# ${rootdisk}#"
+[ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
 
-fln=109
+fln=108
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}
@@ -97,11 +97,10 @@ if [ -n "$splash" -a -f "$splash" ]
 then
 	cp $splash ${dstdir}/isolinux/splash.png
 fi
-if [ -n "$srootdisk" -o -n "$shttphost" ]
-then
-	sed -i -e "$srootdisk" -e "$shttphost" ${dstdir}/preseed-debian.cfg
-fi
-
+echo "Command to modify preseed-debian: -${srootdisk}-, -${shttphost}- "
+[ -n "$srootdisk" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
+[ -n "$shttphost" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
+#
 mkiso ${dstdir} ${isofile}
 cleanup
 exit 0
