@@ -1,5 +1,11 @@
 #!/bin/bash
 #
+if ! sudo ls /tmp > /dev/null 2>&1
+then
+        echo "Require sudo priviledge"
+        exit 1
+fi
+#
 function mkiso()
 {
 	ISODIR=$1
@@ -87,7 +93,7 @@ wdir=${PWD}
 [ -n "${rootdisk}" ] && srootdisk="s# /dev/sda\$# ${rootdisk}#"
 [ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
 
-fln=108
+fln=113
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}
@@ -97,7 +103,6 @@ if [ -n "$splash" -a -f "$splash" ]
 then
 	cp $splash ${dstdir}/isolinux/splash.png
 fi
-echo "Command to modify preseed-debian: -${srootdisk}-, -${shttphost}- "
 [ -n "$srootdisk" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
 [ -n "$shttphost" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
 #
