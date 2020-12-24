@@ -60,12 +60,16 @@ trap exit_trap INT
 mirror=
 splash=
 rootdisk=
-TARGS=$(getopt -l mirror:,splash:,rootdisk: -o m:s:r: -- "$@")
+TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp: -o m:s:r:t: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
+		--ntp)
+			ntpsvr=$2
+			shift
+			;;
 		--rootdisk)
 			rootdisk=$2
 			shift
@@ -92,8 +96,9 @@ wdir=${PWD}
 [ "${mirror}" = "mirrors.ustc.edu.cn" ] && mirror=
 [ -n "${rootdisk}" ] && srootdisk="s# /dev/sda\$# ${rootdisk}#"
 [ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
+[ -n "${ntpsvr}" ] && sntpsvr="s#cn\\.pool\\.ntp\\.org\$#${ntpsvr}#"
 
-fln=113
+fln=120
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}
@@ -105,6 +110,8 @@ then
 fi
 [ -n "$srootdisk" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
 [ -n "$shttphost" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
+echo "New NTP: $ntpsvr, command sed -i -e \"$sntpsvr\" ${dstdir}/preseed-debian.cfg"
+[ -n "$sntpsvr" ] && sed -i -e "$sntpsvr" ${dstdir}/preseed-debian.cfg
 #
 mkiso ${dstdir} ${isofile}
 cleanup
