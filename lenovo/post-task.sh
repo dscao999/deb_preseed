@@ -10,7 +10,7 @@ then
 	cval1="LIOS V2"
 	seds1="s/^${ckey1}=.*$/${ckey1}=\"${cval1}\"/"
 	ckey2="GRUB_CMDLINE_LINUX_DEFAULT"
-	cval2="console=ttyS0,115200n8 splash"
+	cval2="quiet splash"
 	seds2="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
 	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
 fi
@@ -29,11 +29,28 @@ then
 	cp $xfce_def $TARGET/home/lenovo
 fi
 #
+# copy ttyS0 login service, to fix baud at 115200
+#
+cp $TARGET/lib/systemd/system/serial-getty@.service \
+	$TARGET/etc/systemd/system/serial-getty@ttyS0.service
+sed -i -e 's/115200,38400,9600/115200/' $TARGET/etc/systemd/system/serial-getty@ttyS0.service
+#
 # Kill user processes after log out to avoid lingering processes, a bug of print applet
 #
 sed -i -e '/^#KillUserProcesses/aKillUserProcesses=yes' $TARGET/etc/systemd/logind.conf
 #
-endline=44
+# disable the loading of kvm
+#
+if [ -d $TARGET/etc/modprobe.d ]
+then
+	echo "blacklist irqbypass" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+	echo "install irqbypass /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+	echo "blacklist kvm" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+	echo "install kvm /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
+fi
+endline=61
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -82,6 +99,11 @@ ENDDOC
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
 su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
+#
+if /bin/echo 123 > /dev/ttyS0
+then
+	systemctl enable serial-getty@ttyS0.service
+fi
 #
 mv /etc/rc.local /etc/rc.local.once
 [ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
