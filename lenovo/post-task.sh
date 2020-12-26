@@ -4,6 +4,9 @@ TARGET=/target
 [ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
 [ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/skel/.bashrc
 [ -f $TARGET/home/lenovo/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/home/lenovo/.bashrc
+[ -f $TARGET/etc/sudoers ] && chmod u+w $TARGET/etc/sudoers && \
+	sed -e '$aadmin ALL=(ALL:ALL) NOPASSWD: ALL' -i $TARGET/etc/sudoers && \
+	chmod u-w $TARGET/etc/sudoers
 if [ -f $TARGET/etc/default/grub ]
 then
 	ckey1="GRUB_DISTRIBUTOR"
@@ -50,7 +53,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=61
+endline=64
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -77,7 +80,8 @@ EOD
 #
 su -c "unxz -c /home/lenovo/default-desktop.tar.xz | tar -xf -" - lenovo
 #
-useradd -c "Default User, Automatic Login" -m -s /usr/bin/bash $auto_user
+useradd -c "System Administrator" -m -s /bin/bash admin
+useradd -c "Default User, Automatic Login" -m -s /bin/bash $auto_user
 #
 while [ ! -d /home/$auto_user ]
 do
