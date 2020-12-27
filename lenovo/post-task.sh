@@ -70,7 +70,7 @@ exit 0
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #
-update-initramfs -u
+plymouth-set-default-theme -R lenvdi
 update-grub2
 #
 auto_user=liosuser
