@@ -6,6 +6,32 @@ then
         exit 1
 fi
 #
+eval OSNAME=$(sed -e '/^NAME=/!d' /etc/os-release | cut -d= -f2)
+case $OSNAME in
+	"Debian GNU/Linux")
+#
+# default values for Debian
+#
+		ISOLABEL="LENOVO_LIOS_V2_AMD64"
+		ISOLXBIN=/usr/lib/ISOLINUX/isolinux.bin
+		EFIIMAGE=boot/grub/efi.img
+		HDPFXBIN=/usr/lib/ISOLINUX/isohdpfx.bin
+		;;
+	"Fedora")
+#
+# default values for Fedora
+#
+                ISOLABEL="LENOVO_LIOS_V2_AMD64"
+                ISOLXBIN=/usr/share/syslinux/isolinux.bin
+                EFIIMAGE=boot/grub/efi.img
+                HDPFXBIN=/usr/share/syslinux/isohdpfx.bin
+		;;
+	*)
+		echo "Unsupported OS type"
+		exit 1
+		;;
+esac
+#
 function mkiso()
 {
 	ISODIR=$1
@@ -21,13 +47,13 @@ function mkiso()
 	[ -f "$OUTISO" ] && rm $OUTISO
 	#
 	chmod u+w ${ISODIR}/isolinux/isolinux.bin
-	cp /usr/lib/ISOLINUX/isolinux.bin $ISODIR/isolinux/isolinux.bin
-	xorriso -as mkisofs -r -V 'LENOVO_LIOS_V2_AMD64' \
+	cp ${ISOLXBIN} $ISODIR/isolinux/isolinux.bin
+	xorriso -as mkisofs -r -V ${ISOLABEL} \
 		-o $OUTISO \
-		-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
+		-isohybrid-mbr ${HDPFXBIN} \
 		-b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4 \
 		-boot-info-table -no-emul-boot  -eltorito-alt-boot \
-		-e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat \
+		-e ${EFIIMAGE} -no-emul-boot -isohybrid-gpt-basdat \
 		$ISODIR
 }
 
@@ -103,7 +129,7 @@ wdir=${PWD}
 [ -n "${ntpsvr}" ] && sntpsvr="s#cn\\.pool\\.ntp\\.org\$#${ntpsvr}#"
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 
-fln=125
+fln=151
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}

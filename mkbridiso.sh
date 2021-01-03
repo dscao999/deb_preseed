@@ -1,5 +1,8 @@
 #!/bin/bash
 #
+LABEL=LENOVO_LIOS_V2_AMD64
+EFIIMAGE=boot/grub/efi.img
+
 function mkiso()
 {
 	ISODIR=$1
@@ -16,13 +19,15 @@ function mkiso()
 	#
 	chmod u+w ${ISODIR}/isolinux/isolinux.bin
 	cp /usr/lib/ISOLINUX/isolinux.bin $ISODIR/isolinux/isolinux.bin
-	xorriso -as mkisofs -r -V 'LENOVO_LIOS_V2_AMD64' \
+	xorriso -as mkisofs -r -V $LABEL \
 		-o $OUTISO \
 		-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
 		-b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4 \
 		-boot-info-table -no-emul-boot  -eltorito-alt-boot \
-		-e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat \
+		-e $EFIIMAGE -no-emul-boot -isohybrid-gpt-basdat \
 		$ISODIR
 }
 
+[ -n "$1" ] && LABEL="$1"
+[ -n "$2" ] && EFIIMAGE="$2"
 mkiso isotop hybrid.iso
