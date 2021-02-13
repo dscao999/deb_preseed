@@ -83,16 +83,21 @@ function exit_trap()
 
 trap exit_trap INT
 
+pass=P@ssw0rd
 nontp=no
 mirror=
 splash=
 rootdisk=
-TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp -o m:s:r:t:n -- "$@")
+TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass: -o m:s:r:t:np: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
+		--pass)
+			pass="$2"
+			shift
+			;;
 		--nontp)
 			nontp=yes
 			;;
@@ -120,6 +125,13 @@ do
 	shift
 done
 
+passed=
+if [ "$pass" != "P@ssw0rd" ]
+then
+	salt="$(date +%D%H%M%S)"
+	passed="$(mkpasswd $pass $salt -m sha-256)"
+fi
+
 isofile=$1
 wdir=${PWD}
 [ "${rootdisk}" = "/dev/sda" ] && rootdisk=
@@ -128,8 +140,9 @@ wdir=${PWD}
 [ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
 [ -n "${ntpsvr}" ] && sntpsvr="s#cn\\.pool\\.ntp\\.org\$#${ntpsvr}#"
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
+[ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=151
+fln=174
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}
@@ -139,10 +152,20 @@ if [ -n "$splash" -a -f "$splash" ]
 then
 	cp $splash ${dstdir}/isolinux/splash.png
 fi
-[ -n "$srootdisk" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
-[ -n "$shttphost" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
+[ -n "${srootdisk}" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
+[ -n "${shttphost}" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
 [ -n "${snontp}" ] && sed -i -e "$snontp" ${dstdir}/preseed-debian.cfg
-[ -n "$sntpsvr" ] && sed -i -e "$sntpsvr" ${dstdir}/preseed-debian.cfg
+chmod u+w ${dstdir}/lenovo ${dstdir}/lenovo/post-task.sh
+if [ -n "${sntpsvr}" ]
+then
+	sed -i -e "$sntpsvr" ${dstdir}/preseed-debian.cfg
+	sed -i -e "s/^ntp_server=.*$/ntp_server=${ntpsvr}/" ${dstdir}/lenovo/post-task.sh
+fi
+if [ -n "${snontp}" ]
+then
+	sed -i -e "s/^ntp_server=.*$/ntp_server=/" ${dstdir}/lenovo/post-task.sh
+fi
+[ -n "${spassed}" ] && sed -i -e "$spassed" ${dstdir}/preseed-debian.cfg
 #
 mkiso ${dstdir} ${isofile}
 cleanup
