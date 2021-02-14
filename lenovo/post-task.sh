@@ -68,10 +68,18 @@ exit 0
 #
 # one time task after installation
 #
+purge_libreoffice ()
+{
+	apt-get -y purge libreoffice-core libreoffice-common mythes-en-us uno-libs3 ure
+	apt-get -y autoremove
+	apt-get -y dist-upgrade
+	rcpkgs=$(dpkg --list | grep -E '^rc ' |  awk '{print $2}')
+	[ -n "$rcpkgs" ] && dpkg --purge $rcpkgs
+}
+#
 exec 1> /home/lenovo/rc-local.log 2>&1
 #
-plymouth-set-default-theme -R lenvdi
-update-grub2
+purge_libreoffice &
 #
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
@@ -118,10 +126,20 @@ chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
 su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
 #
+ntp_server=cn.pool.ntp.org
+if [ -n "$ntp_server" ]
+then
+	sed -i -e "s/^#NTP=$/NTP=${ntp_server}/" /etc/systemd/timesyncd.conf
+fi
+#
 if /bin/echo 123 > /dev/ttyS0
 then
 	systemctl enable serial-getty@ttyS0.service
 fi
+#
+wait
+plymouth-set-default-theme -R lenvdi
+update-grub2
 #
 mv /etc/rc.local /etc/rc.local.once
 [ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
