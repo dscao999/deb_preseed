@@ -28,6 +28,8 @@ function mkiso()
 		$ISODIR
 }
 
-[ -n "$1" ] && LABEL="$1"
-[ -n "$2" ] && EFIIMAGE="$2"
-mkiso isotop hybrid.iso
+isotop=$1
+[ -z "$isotop" ] && isotop=isotop
+[ -n "$2" ] && LABEL="$2"
+[ -n "$3" ] && EFIIMAGE="$3"
+mkiso $isotop hybrid.iso
