@@ -29,10 +29,12 @@ mkdir $TARGET/var/log/journal
 #
 xfce_def=/cdrom/lenovo/default-desktop.tar.xz
 xfce_empty=/cdrom/lenovo/empty-desktop.tar.xz
+icaclient=/cdrom/lenovo/icaclient.tar.xz
 if [ -f $xfce_def -a -d $TARGET/home/lenovo ]
 then
 	[ -f $xfce_empty ] && cp $xfce_empty $TARGET/home/lenovo
 	cp $xfce_def $TARGET/home/lenovo
+	[ -f $icaclient ] && cp $icaclient $TARGET/home/lenovo
 fi
 #
 # copy ttyS0 login service, to fix baud at 115200
@@ -56,7 +58,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=67
+endline=69
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -113,18 +115,28 @@ done
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
 export LANG="zh_CN.UTF-8"
 export LANGUAGE="zh_CN:zh"
+LOGFILE=liosuser.log
 ##
 ##auto start lios proxy on startup
 ##
-if [ -x /usr/bin/lproxy ]
+if [ -x /opt/Citrix/ICAClient/selfservice ]
 then
-	nohup lproxy --no-quit >> lproxy.log 2>&1 &
+	LOGFILE=icaclient.log
+	export ICAROOT=/opt/Citrix/ICAClient
+	echo "====================$(date)=====================" >> ${LOGFILE}
+	$ICAROOT/selfservice >> ${LOGFILE} 2>&1 &
+elif [ -x /usr/bin/lproxy ]
+then
+	LOGFILE=lproxy.log
+	echo "====================$(date)=====================" >> ${LOGFILE}
+	nohup lproxy --no-quit >> ${LOGFILE} 2>&1 &
 fi
 ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
 su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
+su -c "unxz -c /home/lenovo/icaclient.tar.xz | tar -xf -" - $auto_user
 #
 ntp_server=cn.pool.ntp.org
 if [ -n "$ntp_server" ]
