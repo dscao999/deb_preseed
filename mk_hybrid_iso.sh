@@ -88,12 +88,18 @@ nontp=no
 mirror=
 splash=
 rootdisk=
-TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass: -o m:s:r:t:np: -- "$@")
+myclient=lidcc
+TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client: \
+	-o m:s:r:t:np:c: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
+		--client)
+			myclient="$2"
+			shift
+			;;
 		--pass)
 			pass="$2"
 			shift
@@ -142,7 +148,7 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=174
+fln=193
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 pushd ${srcdir}
@@ -166,6 +172,19 @@ then
 	sed -i -e "s/^ntp_server=.*$/ntp_server=/" ${dstdir}/lenovo/post-task.sh
 fi
 [ -n "${spassed}" ] && sed -i -e "$spassed" ${dstdir}/preseed-debian.cfg
+case "${myclient}" in
+	"vmware")
+		sed -i -e "s/^vmhorizon=.*$/vmhorizon=1/" ${dstdir}/lenovo/post-task.sh
+		;;
+	"citrix")
+		sed -i -e "s/[ \t]*vim$/\tctxusb/" ${dstdir}/preseed-debian.cfg
+		;;
+	"lidcc")
+		;;
+	*)
+		echo "Selected client is not valid: ${myclient}"
+		exit 1
+esac
 #
 mkiso ${dstdir} ${isofile}
 cleanup

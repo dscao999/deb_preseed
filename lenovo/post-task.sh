@@ -4,12 +4,6 @@ TARGET=/target
 [ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
 [ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/skel/.bashrc
 [ -f $TARGET/home/lenovo/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/home/lenovo/.bashrc
-if [ -f $TARGET/etc/sudoers ]
-then
-	chmod u+w $TARGET/etc/sudoers
-	sed -e '$aadmin ALL=(ALL:ALL) NOPASSWD: ALL' -i $TARGET/etc/sudoers
-	chmod u-w $TARGET/etc/sudoers
-fi
 if [ -f $TARGET/etc/default/grub ]
 then
 	ckey1="GRUB_DISTRIBUTOR"
@@ -36,6 +30,9 @@ then
 	cp $xfce_def $TARGET/home/lenovo
 	[ -f $icaclient ] && cp $icaclient $TARGET/home/lenovo
 fi
+# VMware view installation bundle
+vminst=/cdrom/pool/lenvdi/VMware-Horizon-Client-2006-8.0.0-16522670.x64.bundle
+[ -f $vminst ] && cp $vminst $TARGET/home/lenovo
 #
 # copy ttyS0 login service, to fix baud at 115200
 #
@@ -58,7 +55,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=69
+endline=66
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -78,10 +75,34 @@ purge_libreoffice ()
 	rcpkgs=$(dpkg --list | grep -E '^rc ' |  awk '{print $2}')
 	[ -n "$rcpkgs" ] && dpkg --purge $rcpkgs
 }
+
+install_vmhorizon ()
+{
+	bundle=$1
+	if [ ! -x $bundle ]
+	then
+		echo "Cannot execute $bundle"
+		return 1
+	fi
+	export TERM=dumb
+	export VMWARE_EULAS_AGREED=yes
+	$bundle --console --required
+}
+#
+vmhorizon=0
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #
 purge_libreoffice &
+#
+xfce_def=/home/lenovo/default-desktop.tar.xz
+xfce_empty=/home/lenovo/empty-desktop.tar.xz
+icaclient=/home/lenovo/icaclient.tar.xz
+vminstf=/home/lenovo/VMware-Horizon-Client-2006-8.0.0-16522670.x64.bundle
+if [ $vmhorizon -eq 1 ]
+then
+	install_vmhorizon $vminstf
+fi
 #
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
@@ -91,7 +112,7 @@ autologin-user=$auto_user
 autologin-user-timeout=0
 EOD
 #
-su -c "unxz -c /home/lenovo/default-desktop.tar.xz | tar -xf -" - lenovo
+su -c "unxz -c $xfce_def | tar -xf -" - lenovo
 cat > /home/lenovo/.vimrc <<"ENDDOC"
 filetype plugin indent on
 syntax on
@@ -104,7 +125,6 @@ set mouse=
 ENDDOC
 chown lenovo:lenovo /home/lenovo/.vimrc
 #
-useradd -c "System Administrator" -m -s /bin/bash admin
 useradd -c "Default User, Automatic Login" -m -s /bin/bash $auto_user
 #
 while [ ! -d /home/$auto_user ]
@@ -113,8 +133,7 @@ do
 done
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
-export LANG="zh_CN.UTF-8"
-export LANGUAGE="zh_CN:zh"
+export LANG="zh_CN.utf8"
 LOGFILE=liosuser.log
 ##
 ##auto start lios proxy on startup
@@ -135,8 +154,8 @@ ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
-su -c "unxz -c /home/lenovo/empty-desktop.tar.xz | tar -xf -" - $auto_user
-su -c "unxz -c /home/lenovo/icaclient.tar.xz | tar -xf -" - $auto_user
+su -c "unxz -c $xfce_empty | tar -xf -" - $auto_user
+su -c "unxz -c $icaclient /home/lenovo/icaclient.tar.xz | tar -xf -" - $auto_user
 #
 ntp_server=cn.pool.ntp.org
 if [ -n "$ntp_server" ]
@@ -148,6 +167,8 @@ if /bin/echo 123 > /dev/ttyS0
 then
 	systemctl enable serial-getty@ttyS0.service
 fi
+#
+rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 wait
 plymouth-set-default-theme -R lenvdi
