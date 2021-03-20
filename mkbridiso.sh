@@ -29,7 +29,8 @@ function mkiso()
 }
 
 isotop=$1
+oiso=$2
 [ -z "$isotop" ] && isotop=isotop
-[ -n "$2" ] && LABEL="$2"
-[ -n "$3" ] && EFIIMAGE="$3"
+[ -n "$3" ] && LABEL="$3"
+[ -n "$4" ] && EFIIMAGE="$4"
 mkiso $isotop hybrid.iso

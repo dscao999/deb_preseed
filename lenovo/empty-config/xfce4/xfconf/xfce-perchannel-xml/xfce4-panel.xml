@@ -16,6 +16,7 @@
         <value type="int" value="3"/>
         <value type="int" value="4"/>
       </property>
+      <property name="leave-opacity" type="uint" value="0"/>
     </property>
   </property>
   <property name="plugins" type="empty">

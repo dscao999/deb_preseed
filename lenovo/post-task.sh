@@ -144,11 +144,16 @@ then
 	export ICAROOT=/opt/Citrix/ICAClient
 	echo "====================$(date)=====================" >> ${LOGFILE}
 	$ICAROOT/selfservice >> ${LOGFILE} 2>&1 &
+elif [ -x /usr/bin/vmware-view ]
+then
+	LOGFILE=vmware-view.log
+	echo "====================$(date)=====================" >> ${LOGFILE}
+	vmware-view >> ${LOGFILE} 2>&1 &
 elif [ -x /usr/bin/lproxy ]
 then
 	LOGFILE=lproxy.log
 	echo "====================$(date)=====================" >> ${LOGFILE}
-	nohup lproxy --no-quit >> ${LOGFILE} 2>&1 &
+	lproxy --no-quit >> ${LOGFILE} 2>&1 &
 fi
 ENDDOC
 #
