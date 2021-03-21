@@ -31,8 +31,9 @@ then
 	[ -f $icaclient ] && cp $icaclient $TARGET/home/lenovo
 fi
 # VMware view installation bundle
-vminst=/cdrom/pool/lenvdi/VMware-Horizon-Client-2006-8.0.0-16522670.x64.bundle
-[ -f $vminst ] && cp $vminst $TARGET/home/lenovo
+vminst=/cdrom/pool/lenvdi/VMware-Horizon-Client.x64.bundle
+[ -f $vminst ] && cp $vminst $TARGET/home/lenovo && \
+	chmod +x $TARGET/home/lenovo/VMware-Horizon-Client.x64.bundle
 #
 # copy ttyS0 login service, to fix baud at 115200
 #
@@ -55,7 +56,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=66
+endline=67
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -98,7 +99,7 @@ purge_libreoffice &
 xfce_def=/home/lenovo/default-desktop.tar.xz
 xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
-vminstf=/home/lenovo/VMware-Horizon-Client-2006-8.0.0-16522670.x64.bundle
+vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
 if [ $vmhorizon -eq 1 ]
 then
 	install_vmhorizon $vminstf
@@ -133,8 +134,10 @@ do
 done
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
-export LANG="zh_CN.utf8"
-LOGFILE=liosuser.log
+if [ -r $PWD/.i18n ]
+then
+	. ${PWD}/.i18n
+fi
 ##
 ##auto start lios proxy on startup
 ##
@@ -161,6 +164,17 @@ chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
 #
 su -c "unxz -c $xfce_empty | tar -xf -" - $auto_user
 su -c "unxz -c $icaclient /home/lenovo/icaclient.tar.xz | tar -xf -" - $auto_user
+#
+[ -d /etc/xdg/xfce4/kiosk ] || mkdir /etc/xdg/xfce4/kiosk
+echo "[xfce4-session]" > /etc/xdg/xfce4/kiosk/kioskrc
+echo "SaveSession=lenovo" >> /etc/xdg/xfce4/kiosk/kioskrc
+#
+panel=xfce4/xfconf/xfce-perchannel-xml
+if [ -d /etc/xdg/$panel ]
+then
+	sed -e "/^<channel name=/s/>/ locked=\"$auto_user\">/" \
+		/home/$auto_user/.config/$panel/xfce4-panel.xml > /etc/xdg/$panel/xfce4-panel.xml
+fi
 #
 ntp_server=cn.pool.ntp.org
 if [ -n "$ntp_server" ]

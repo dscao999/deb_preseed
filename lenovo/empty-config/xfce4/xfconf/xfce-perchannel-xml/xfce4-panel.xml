@@ -15,6 +15,7 @@
         <value type="int" value="2"/>
         <value type="int" value="3"/>
         <value type="int" value="4"/>
+        <value type="int" value="5"/>
       </property>
       <property name="leave-opacity" type="uint" value="0"/>
     </property>
@@ -23,6 +24,7 @@
     <property name="plugin-1" type="string" value="launcher">
       <property name="items" type="array">
         <value type="string" value="16155160431.desktop"/>
+        <value type="string" value="16163209561.desktop"/>
         <value type="string" value="16155160542.desktop"/>
         <value type="string" value="16155160733.desktop"/>
         <value type="string" value="16155161014.desktop"/>
@@ -33,5 +35,6 @@
     <property name="plugin-4" type="string" value="pulseaudio">
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>
     </property>
+    <property name="plugin-5" type="string" value="clock"/>
   </property>
 </channel>
