@@ -12,7 +12,6 @@ case $OSNAME in
 #
 # default values for Debian
 #
-		ISOLABEL="LENOVO_LIOS_V2_AMD64"
 		ISOLXBIN=/usr/lib/ISOLINUX/isolinux.bin
 		EFIIMAGE=boot/grub/efi.img
 		HDPFXBIN=/usr/lib/ISOLINUX/isohdpfx.bin
@@ -21,7 +20,6 @@ case $OSNAME in
 #
 # default values for Fedora
 #
-                ISOLABEL="LENOVO_LIOS_V2_AMD64"
                 ISOLXBIN=/usr/share/syslinux/isolinux.bin
                 EFIIMAGE=boot/grub/efi.img
                 HDPFXBIN=/usr/share/syslinux/isohdpfx.bin
@@ -34,21 +32,22 @@ esac
 #
 function mkiso()
 {
+	local ISODIR OUTISO
+
 	ISODIR=$1
 	OUTISO=$2
-
 	[ -z "$ISODIR" ] && ISODIR=isotop
 	if [ ! -d "$ISODIR" ]
 	then
 		echo "Invalid ISO Top Directory: $ISODIR"
 		exit 1
 	fi
-	[ -z "$OUTISO" ] && OUTISO=hybrid.iso
+	[ -z "$OUTISO" ] && OUTISO=-
 	[ -f "$OUTISO" ] && rm $OUTISO
 	#
 	chmod u+w ${ISODIR}/isolinux/isolinux.bin
 	cp ${ISOLXBIN} $ISODIR/isolinux/isolinux.bin
-	xorriso -as mkisofs -r -V ${ISOLABEL} \
+	xorriso -as mkisofs -r -volid "${ISOLABEL}" \
 		-o $OUTISO \
 		-isohybrid-mbr ${HDPFXBIN} \
 		-b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4 \
@@ -57,7 +56,7 @@ function mkiso()
 		$ISODIR
 }
 
-srciso=./srciso-$$.iso
+srciso=srciso-$$.iso
 srcdir=srcdir-$$
 dstdir=dstdir-$$
 rm -rf $srcdir
@@ -148,9 +147,13 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=193
+fln=196
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
+loopdev=$(sudo losetup|fgrep ${srciso})
+eval $(sudo blkid $loopdev|cut -d: -f2)
+ISOLABEL=$LABEL
+#
 pushd ${srcdir}
 find . -print | cpio -pd ${wdir}/${dstdir} > /dev/null
 popd
