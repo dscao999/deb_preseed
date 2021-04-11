@@ -133,6 +133,10 @@ do
 	sleep 1
 done
 #
+cat > /home/$auto_user/.i18n <<"ENDDOC"
+LANG=zh_CN.utf8
+ENDDOC
+#
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
 if [ -r $PWD/.i18n ]
 then

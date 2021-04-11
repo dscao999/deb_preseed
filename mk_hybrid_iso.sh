@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-if ! sudo ls /tmp > /dev/null 2>&1
+if ! sudo ls /etc > /dev/null 2>&1
 then
-        echo "Require sudo priviledge"
-        exit 1
+	echo "sudo failed. sudo without password is required for this operation."
+	exit 1
 fi
 #
 eval OSNAME=$(sed -e '/^NAME=/!d' /etc/os-release | cut -d= -f2)
@@ -80,6 +80,36 @@ function exit_trap()
 	exit 1
 }
 
+function check_usbdisk()
+{
+	local dev bdev devpath mounted
+
+	dev=$1
+	if [ -z "$dev" ]
+	then
+		echo "Please specify a UDisk device."
+		exit 5
+	fi
+	if [ ! -b $dev ]
+	then
+		echo "Device $dev is not a block device"
+		exit 1
+	fi
+	bdev=$(basename ${dev})
+	devpath=$(ls -l /sys/block|fgrep $bdev|fgrep usb)
+	if [ -z "$devpath" ]
+	then
+		echo "Device $dev is not a USB block device"
+		exit 2
+	fi
+	mounted=$(mount | fgrep $dev)
+	if [ -n "$mounted" ]
+	then
+		echo "Please umount file systems on deivce $dev"
+		exit 3
+	fi
+}
+
 trap exit_trap INT
 
 pass=P@ssw0rd
@@ -138,6 +168,14 @@ then
 fi
 
 isofile=$1
+[ -z "$isofile" ] && isofile=hybrid.iso
+if [ "${isofile#/dev/}" = "$isofile" ]
+then
+	TOUSB=0
+else
+	check_usbdisk $isofile
+	TOUSB=1
+fi
 wdir=${PWD}
 [ "${rootdisk}" = "/dev/sda" ] && rootdisk=
 [ "${mirror}" = "mirrors.ustc.edu.cn" ] && mirror=
@@ -147,7 +185,7 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=196
+fln=239
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -189,7 +227,12 @@ case "${myclient}" in
 		exit 1
 esac
 #
-mkiso ${dstdir} ${isofile}
+if [ $TOUSB -eq 1 ]
+then
+	mkiso ${dstdir} | sudo dd of=${isofile} obs=128K oflag=direct conv=nocreat
+else
+	mkiso ${dstdir} ${isofile}
+fi
 cleanup
 exit 0
 #END OF SCRIPT
