@@ -13,6 +13,7 @@ then
 	cval2="quiet splash"
 	seds2="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
 	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
+	sed -i -e 's/^GRUB_TIMEOUT=.*$/GRUB_TIMEOUT=0/' $TARGET/etc/default/grub
 fi
 firmfile=/cdrom/lenovo/i915-firmware.tar.xz
 if [ -f $firmfile ]
@@ -56,7 +57,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=67
+endline=68
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -192,6 +193,11 @@ then
 fi
 #
 rm -f $vminstf $icaclient $xfce_empty $xfce_def
+#
+if dpkg --list icaclient
+then
+	systemctl enable ctxlogd
+fi
 #
 wait
 plymouth-set-default-theme -R lenvdi

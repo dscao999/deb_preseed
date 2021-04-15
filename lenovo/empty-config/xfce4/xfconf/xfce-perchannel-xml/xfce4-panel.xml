@@ -16,6 +16,8 @@
         <value type="int" value="3"/>
         <value type="int" value="4"/>
         <value type="int" value="5"/>
+        <value type="int" value="6"/>
+        <value type="int" value="7"/>
       </property>
       <property name="leave-opacity" type="uint" value="0"/>
     </property>
@@ -36,5 +38,7 @@
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>
     </property>
     <property name="plugin-5" type="string" value="clock"/>
+    <property name="plugin-6" type="string" value="separator"/>
+    <property name="plugin-7" type="string" value="systemload"/>
   </property>
 </channel>

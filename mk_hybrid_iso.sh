@@ -185,7 +185,7 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=239
+fln=240
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -221,6 +221,7 @@ case "${myclient}" in
 		sed -i -e "s/[ \t]*vim$/\tctxusb/" ${dstdir}/preseed-debian.cfg
 		;;
 	"lidcc")
+		sed -i -e "s/[ \t]*vim$/\tvirt-viewer/" ${dstdir}/preseed-debian.cfg
 		;;
 	*)
 		echo "Selected client is not valid: ${myclient}"
