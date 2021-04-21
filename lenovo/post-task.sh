@@ -1,5 +1,13 @@
 #!/bin/sh -e
 #
+client=$1
+if [ "$client" != "citrix" -a "$client" != "vmware" -a
+	$"client" != "lidcc" ]
+then
+	echo "Unknown client: $client"
+	exit 1
+fi
+#
 TARGET=/target
 [ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
 [ -f $TARGET/etc/skel/.bashrc ] && sed -e '$aset -o vi' -i $TARGET/etc/skel/.bashrc
@@ -25,6 +33,7 @@ mkdir $TARGET/var/log/journal
 xfce_def=/cdrom/lenovo/default-desktop.tar.xz
 xfce_empty=/cdrom/lenovo/empty-desktop.tar.xz
 icaclient=/cdrom/lenovo/icaclient.tar.xz
+rootca=/cdrom/lenovo/rootca.pem
 if [ -f $xfce_def -a -d $TARGET/home/lenovo ]
 then
 	[ -f $xfce_empty ] && cp $xfce_empty $TARGET/home/lenovo
@@ -35,6 +44,7 @@ fi
 vminst=/cdrom/pool/lenvdi/VMware-Horizon-Client.x64.bundle
 [ -f $vminst ] && cp $vminst $TARGET/home/lenovo && \
 	chmod +x $TARGET/home/lenovo/VMware-Horizon-Client.x64.bundle
+[ -f $rootca ] && cp $rootca $TARGET/home/lenovo
 #
 # copy ttyS0 login service, to fix baud at 115200
 #
@@ -57,7 +67,7 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=68
+endline=78
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -196,7 +206,8 @@ rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 if dpkg --list icaclient
 then
-	systemctl enable ctxlogd
+#	systemctl enable ctxlogd
+	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' /opt/Citrix/ICAClient/config/module.ini
 fi
 #
 wait

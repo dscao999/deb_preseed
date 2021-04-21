@@ -110,7 +110,7 @@ function check_usbdisk()
 	fi
 }
 
-trap exit_trap INT
+trap exit_trap INT EXIT
 
 pass=P@ssw0rd
 nontp=no
@@ -185,7 +185,7 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=240
+fln=241
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -227,6 +227,7 @@ case "${myclient}" in
 		echo "Selected client is not valid: ${myclient}"
 		exit 1
 esac
+sed -i -e "s/post-task.sh lidcc\$/post-task.sh $myclient/" ${dstdir}/preseed-debian.cfg
 #
 if [ $TOUSB -eq 1 ]
 then
@@ -234,6 +235,6 @@ then
 else
 	mkiso ${dstdir} ${isofile}
 fi
-cleanup
+#cleanup
 exit 0
 #END OF SCRIPT
