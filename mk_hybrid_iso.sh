@@ -117,14 +117,24 @@ nontp=no
 mirror=
 splash=
 rootdisk=
+rootca=
 myclient=lidcc
-TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client: \
-	-o m:s:r:t:np:c: -- "$@")
+TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client:,rootca: \
+	-o m:s:r:t:np:c:a: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
+		--rootca)
+			rootca="$2"
+			if [ ! -f $rootca -o ! -r $rootca ]
+			then
+				echo "ROOT CA \"$rootca\" cannot be read."
+				exit 2
+			fi
+			shift
+			;;
 		--client)
 			myclient="$2"
 			shift
@@ -185,7 +195,7 @@ wdir=${PWD}
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=241
+fln=252
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -228,6 +238,7 @@ case "${myclient}" in
 		exit 1
 esac
 sed -i -e "s/post-task.sh lidcc\$/post-task.sh $myclient/" ${dstdir}/preseed-debian.cfg
+[ -n "$rootca" ] && chmod u+w ${dstdir}/lenovo && cp $rootca ${dstdir}/lenovo/rootca.pem
 #
 if [ $TOUSB -eq 1 ]
 then

@@ -207,7 +207,14 @@ rm -f $vminstf $icaclient $xfce_empty $xfce_def
 if dpkg --list icaclient
 then
 #	systemctl enable ctxlogd
-	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' /opt/Citrix/ICAClient/config/module.ini
+	icaroot=/opt/Citrix/ICAClient
+	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' ${icaroot}/config/module.ini
+	if [ -f /home/lenovo/rootca.pem ]
+	then
+		cp /home/lenovo/rootca.pem ${icaroot}/keystore/cacerts/
+		${icaroot}/util/ctx_rehash
+		rm -f /home/lenovo/rootca.pem
+	fi
 fi
 #
 wait
