@@ -67,7 +67,16 @@ then
 	echo "blacklist kvm_intel" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 	echo "install kvm_intel /bin/false" >> $TARGET/etc/modprobe.d/local-blacklist.conf
 fi
-endline=78
+#
+# set EFI ESP label to LIOS_ESP
+#
+efidev=$(mount|fgrep "$TARGET/boot/efi" |cut -d' ' -f1)
+if [ -n "$efidev" ]
+then
+	sync && fatlabel $efidev LIOS_ESP && sync
+fi
+#
+endline=87
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -149,29 +158,13 @@ LANG=zh_CN.utf8
 ENDDOC
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
+##
+## set variable LANG from .i18n, automatically generated
+## do not edit
+##
 if [ -r $PWD/.i18n ]
 then
 	. ${PWD}/.i18n
-fi
-##
-##auto start lios proxy on startup
-##
-if [ -x /opt/Citrix/ICAClient/selfservice ]
-then
-	LOGFILE=icaclient.log
-	export ICAROOT=/opt/Citrix/ICAClient
-	echo "====================$(date)=====================" >> ${LOGFILE}
-	$ICAROOT/selfservice >> ${LOGFILE} 2>&1 &
-elif [ -x /usr/bin/vmware-view ]
-then
-	LOGFILE=vmware-view.log
-	echo "====================$(date)=====================" >> ${LOGFILE}
-	vmware-view >> ${LOGFILE} 2>&1 &
-elif [ -x /usr/bin/lproxy ]
-then
-	LOGFILE=lproxy.log
-	echo "====================$(date)=====================" >> ${LOGFILE}
-	lproxy --no-quit >> ${LOGFILE} 2>&1 &
 fi
 ENDDOC
 #
@@ -206,8 +199,13 @@ rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 if dpkg --list icaclient
 then
-#	systemctl enable ctxlogd
+	autoapp=/usr/share/applications/selfservice.desktop
+	if systemctl --all list-units | fgrep ctxlogd > /dev/null 2>&1
+	then
+		systemctl enable ctxlogd
+	fi
 	icaroot=/opt/Citrix/ICAClient
+	[ -w ${icaroot}/config/module.ini ] && \
 	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' ${icaroot}/config/module.ini
 	if [ -f /home/lenovo/rootca.pem ]
 	then
@@ -215,6 +213,11 @@ then
 		${icaroot}/util/ctx_rehash
 		rm -f /home/lenovo/rootca.pem
 	fi
+	[ -r $autoapp ] && cp $autoapp /home/$auto_user/.config/autostart/
+fi
+if [ -r /usr/share/applications/vmware-view.desktop ]
+then
+	cp /usr/share/applications/vmware-view.desktop /home/$auto_user/.config/autostart/
 fi
 #
 wait
