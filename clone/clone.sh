@@ -29,7 +29,7 @@ function lios_clone()
 	clone_dir=clone-$(date "+%m%d%y-%H%M")
 	target_dir=$target_base/$clone_dir
 	#
-	sudo blkid | fgrep LIOS > /tmp/sys_disk_partitions.txt
+	sudo blkid | fgrep LIOS_ > /tmp/sys_disk_partitions.txt
 	parts=$(awk -F": " '{print $1}' /tmp/sys_disk_partitions.txt)
 	if [ ${#parts} -eq 0 ]
 	then
@@ -46,6 +46,7 @@ function lios_clone()
 	#
 	sysdisk=${parts[0]%%[0-9]*}
 	echo "System disk to clone: $sysdisk"
+	cat /sys/block/$(basename $sysdisk)/size > $target_dir/sys_disk_size.txt
 	sudo sfdisk --dump ${sysdisk} | cat > $target_dir/sys_disk_sfdisk.dat
 	pstart=$(fgrep ${sysdisk}1 $target_dir/sys_disk_sfdisk.dat|awk '{print $4}')
 	pstart=${pstart%,}
@@ -55,13 +56,13 @@ function lios_clone()
 	#  mount and copy file system
 	#
 	#
-	trap cleanup EXIT INT
+	trap cleanup INT
 	#
 	[ -d $srcdir ] || mkdir $srcdir
 	for dpart in ${parts[@]}
 	do
 		echo "Partiton: $dpart"
-		info_line="$(fgrep $dpart $target_dir/sys_partitions.txt)"
+		info_line="$(fgrep $dpart $target_dir/sys_disk_partitions.txt)"
 		for keyval in $info_line
 		do
 			key=${keyval%%=*}
