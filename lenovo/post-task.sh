@@ -1,8 +1,8 @@
 #!/bin/sh -e
 #
 client=$1
-if [ "$client" != "citrix" -a "$client" != "vmware" -a
-	$"client" != "lidcc" ]
+if [ "$client" != "citrix" -a "$client" != "vmware" -a \
+	"$client" != "lidcc" ]
 then
 	echo "Unknown client: $client"
 	exit 1
@@ -197,9 +197,10 @@ fi
 #
 rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
-if dpkg --list icaclient
+appdesk=/usr/share/applications
+if dpkg --list icaclient > /dev/null 2>&1
 then
-	autoapp=/usr/share/applications/selfservice.desktop
+	autoapp=$appdesk/selfservice.desktop
 	if systemctl --all list-units | fgrep ctxlogd > /dev/null 2>&1
 	then
 		systemctl enable ctxlogd
@@ -214,12 +215,37 @@ then
 		rm -f /home/lenovo/rootca.pem
 	fi
 	[ -r $autoapp ] && cp $autoapp /home/$auto_user/.config/autostart/
-fi
-if [ -r /usr/share/applications/vmware-view.desktop ]
+#
+elif [ -r $appdesk/vmware-view.desktop ]
 then
-	cp /usr/share/applications/vmware-view.desktop /home/$auto_user/.config/autostart/
+	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/autostart/
+#
+elif dpkg --list lidc-client > /dev/null 2>&1
+then
+	if [ -f /home/lenovo/rootca.pem ]
+	then
+		cp /home/lenovo/rootca.pem /etc/ssl/certs/lidc-rootca.pem
+		pushd /etc/ssl/certs
+		index=$(openssl x509 -noout -hash -in lidc-rootca.pem)
+		ln -s lidc-rootca.pem ${index}.0
+		popd
+	fi
+	[ -r $appdesk/lidc-client.desktop ] && \
+		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/autostart/
 fi
 #
+swapdev=$(swapon -s | fgrep /dev | awk '{print $1}')
+if [ -b $swapdev ]
+then
+	info_line="$(blkid $swapdev)"
+	for vari in $info_line
+	do
+		[ ${vari%=*} = ${vari} ] && continue
+		eval $vari
+	done
+	swapoff $swapdev
+	mkswap --label LIOS_SWAP --uuid $UUID $swapdev
+fi
 wait
 plymouth-set-default-theme -R lenvdi
 update-grub2
