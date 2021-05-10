@@ -231,7 +231,7 @@ case "${myclient}" in
 		sed -i -e "s/[ \t]*vim$/\tctxusb/" ${dstdir}/preseed-debian.cfg
 		;;
 	"lidcc")
-		sed -i -e "s/[ \t]*vim$/\tvirt-viewer/" ${dstdir}/preseed-debian.cfg
+		sed -i -e "s/[ \t]*vim$/\tlidc-client/" ${dstdir}/preseed-debian.cfg
 		;;
 	*)
 		echo "Selected client is not valid: ${myclient}"
