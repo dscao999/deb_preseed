@@ -95,6 +95,14 @@ purge_libreoffice ()
 	apt-get -y dist-upgrade
 	rcpkgs=$(dpkg --list | grep -E '^rc ' |  awk '{print $2}')
 	[ -n "$rcpkgs" ] && dpkg --purge $rcpkgs
+	if [ $vmhorizon -eq 1 ] || dpkg --list icaclient
+	then
+		if dpkg --list lidc-client
+		then
+			apt-get -y purge lidc-client virt-viewer
+			apt-get -y autoremove
+		fi
+	fi
 }
 
 install_vmhorizon ()
