@@ -95,7 +95,7 @@ purge_libreoffice ()
 	apt-get -y dist-upgrade
 	rcpkgs=$(dpkg --list | grep -E '^rc ' |  awk '{print $2}')
 	[ -n "$rcpkgs" ] && dpkg --purge $rcpkgs
-	if [ $vmhorizon -eq 1 ] || dpkg --list icaclient
+	if [ $vmhorizon -eq 1 ] || dpkg --list icaclient > /dev/null 2>&1
 	then
 		if dpkg --list lidc-client
 		then
@@ -206,6 +206,7 @@ fi
 rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 appdesk=/usr/share/applications
+usrdesk=xfce4/panel/launcher-10/16209940802.desktop
 if dpkg --list icaclient > /dev/null 2>&1
 then
 	autoapp=$appdesk/selfservice.desktop
@@ -232,14 +233,17 @@ elif dpkg --list lidc-client > /dev/null 2>&1
 then
 	if [ -f /home/lenovo/rootca.pem ]
 	then
-		cp /home/lenovo/rootca.pem /etc/ssl/certs/lidc-rootca.pem
+		cp /home/lenovo/rootca.pem /etc/ssl/certs/oVirt-rootca.pem
 		pushd /etc/ssl/certs
-		index=$(openssl x509 -noout -hash -in lidc-rootca.pem)
-		ln -s lidc-rootca.pem ${index}.0
+		index=$(openssl x509 -noout -hash -in oVirt-rootca.pem)
+		ln -s oVirt-rootca.pem ${index}.0
 		popd
 	fi
-	[ -r $appdesk/lidc-client.desktop ] && \
+	if [ -r $appdesk/lidc-client.desktop ]
+	then
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/autostart/
+		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/$usrdesk
+	fi
 fi
 #
 swapdev=$(swapon -s | fgrep /dev | awk '{print $1}')
