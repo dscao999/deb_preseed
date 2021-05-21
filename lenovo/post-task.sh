@@ -95,7 +95,7 @@ purge_libreoffice ()
 	apt-get -y dist-upgrade
 	rcpkgs=$(dpkg --list | grep -E '^rc ' |  awk '{print $2}')
 	[ -n "$rcpkgs" ] && dpkg --purge $rcpkgs
-	if [ $vmhorizon -eq 1 ] || dpkg --list icaclient > /dev/null 2>&1
+	if [ $vmhorizon -eq 1 ] || dpkg --list icaclient
 	then
 		if dpkg --list lidc-client
 		then
@@ -121,6 +121,7 @@ install_vmhorizon ()
 vmhorizon=0
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
+#set -x
 #
 purge_libreoffice &
 #
@@ -207,7 +208,7 @@ rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 appdesk=/usr/share/applications
 usrdesk=xfce4/panel/launcher-10/16209940802.desktop
-if dpkg --list icaclient > /dev/null 2>&1
+if dpkg --list icaclient
 then
 	autoapp=$appdesk/selfservice.desktop
 	if systemctl --all list-units | fgrep ctxlogd > /dev/null 2>&1
@@ -228,8 +229,9 @@ then
 elif [ -r $appdesk/vmware-view.desktop ]
 then
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/autostart/
+	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/$usrdesk
 #
-elif dpkg --list lidc-client > /dev/null 2>&1
+elif dpkg --list lidc-client
 then
 	if [ -f /home/lenovo/rootca.pem ]
 	then
@@ -249,14 +251,11 @@ fi
 swapdev=$(swapon -s | fgrep /dev | awk '{print $1}')
 if [ -b $swapdev ]
 then
-	info_line="$(blkid $swapdev)"
-	for vari in $info_line
-	do
-		[ ${vari%=*} = ${vari} ] && continue
-		eval $vari
-	done
+	eval $(blkid $swapdev|cut -d: -f2)
+	set_uuid=
+	[ -n "$UUID" ] && set_uuid="--uuid $UUID"
 	swapoff $swapdev
-	mkswap --label LIOS_SWAP --uuid $UUID $swapdev
+	mkswap -f --label LIOS_SWAP $set_uuid $swapdev
 fi
 wait
 plymouth-set-default-theme -R lenvdi
