@@ -1,12 +1,15 @@
 #!/bin/bash
 #
-target_base=/var/www/html/debian
+target_base=/var/www/html/debian/cloned_images
+[ -d $target_base ] || mkdir $target_base
+MYPID=$$
+MYCWD=${PWD}
 #
 srcdir=${PWD}/src-$$
 #
 if ! sudo ls /etc > /dev/null 2>&1
 then
-	echo "sudo without password priviledge is required!"
+	echo "sudo priviledge is required!"
 	exit 4
 fi
 #
@@ -14,6 +17,9 @@ fi
 #
 function cleanup()
 {
+	cd $MYCWD
+	kill $(ps --ppid $MYPID -o pid|sed -e '/PID/d')
+	sleep 1
 	if mountpoint -q $srcdir
 	then
 		sudo umount $srcdir
@@ -21,6 +27,15 @@ function cleanup()
 	[ -d $srcdir ] && rmdir $srcdir
 	[ -n "$target_dir" ] && rm -rf $target_dir
 }
+#
+#  abnormal exit
+#
+function abnormal()
+{
+	cleanup
+	exit 10
+}
+trap abnormal INT
 #
 # clone LIOS
 #
@@ -45,19 +60,20 @@ function lios_clone()
 	cp /tmp/sys_disk_partitions.txt $target_dir/sys_disk_partitions.txt
 	rm /tmp/sys_disk_partitions.txt
 	#
-	sysdisk=${parts[0]%%[0-9]*}
+	suffix=
+	blkdev=$(basename $parts[0])
+	[ "$blkdev" != ${blkdev#nvme} -o "$blkdev" != "${blkdev#mmc}" ] && suffix=p
+	sysdisk=${parts[0]%${suffix}[0-9]*}
 	echo "System disk to clone: $sysdisk"
 	cat /sys/block/$(basename $sysdisk)/size > $target_dir/sys_disk_size.txt
 	sudo sfdisk --dump ${sysdisk} | cat > $target_dir/sys_disk_sfdisk.dat
-	pstart=$(fgrep ${sysdisk}1 $target_dir/sys_disk_sfdisk.dat|awk '{print $4}')
+	pstart=$(fgrep ${sysdisk}${suffix}1 $target_dir/sys_disk_sfdisk.dat|awk '{print $4}')
 	pstart=${pstart%,}
 	echo "Partition Start Sector: ${pstart}"
 	sudo dd if=${sysdisk} bs=512 count=$pstart | cat > $target_dir/grub_code.dat
 	#
 	#  mount and copy file system
 	#
-	#
-	trap cleanup INT
 	#
 	[ -d $srcdir ] || mkdir $srcdir
 	while read dp labels
@@ -66,6 +82,7 @@ function lios_clone()
 		eval $labels
 #
 		[ "$TYPE" = "swap" ] && continue
+		[ "$TYPE" = "ext2" ] && continue
 		sudo mount -t $TYPE -o ro $dpart $srcdir
 		tsize=$(df -k | fgrep $dpart | awk '{print $3}')
 		echo "Size: $tsize"
@@ -83,7 +100,7 @@ function lios_clone()
 	echo "LIOS cloned into directory: $target_dir"
 }
 #
-#  extract the python utility tweak_sfdisk.py
+#  extract, the python utility tweak_sfdisk.py
 #
 function tweak_sfdisk()
 {
@@ -91,6 +108,7 @@ function tweak_sfdisk()
 #!/usr/bin/python3
 #
 import sys, os, os.path
+import stat
 
 argc = len(sys.argv)
 sysdisk = ''
@@ -102,15 +120,21 @@ if len(sysdisk) == 0:
 if not os.path.exists(sysdisk):
     print("Device does not exist: {}".format(sysdisk))
     sys.exit(1)
+mode = os.stat(sysdisk).st_mode
+if not stat.S_ISBLK(mode):
+    print("Device {} is not a block device.".format(sysdisk))
+    sys.exit(1)
+
 src_spec = ''
 if argc > 2:
     src_spec = sys.argv[2]
 if len(src_spec) == 0:
-    print("Please specify a clone image directory.")
+    print("Please specify the cloned image directory.")
     sys.exit(1)
 if not os.path.isdir(src_spec):
     print("Clone image directory: {} does not exist.".format(src_spec))
     sys.exit(1)
+
 tar_spec = ''
 if argc > 3:
     tar_spec = sys.argv[3]
@@ -123,9 +147,9 @@ except:
     print("Unable to open {} for writing.".format(tar_spec))
     sys.exit(7)
 
-part = ''
+partprefix = ''
 if sysdisk[:9] == '/dev/nvme' or sysdisk[:8] == '/dev/mmc':
-    part = 'p'
+    partprefix = 'p'
 
 sysdisk_size = 0
 bname = sysdisk.split('/')[-1]
@@ -136,17 +160,28 @@ except:
     print("Unable to get disk size: {}".format(sysdisk))
     sys.exit(6)
 
-print("Disk size: {}".format(sysdisk_size))
+print("Disk Size: {}".format(sysdisk_size))
 
+nlast_lba = sysdisk_size
+olast_lba = 0
+first_lba = 0
 try:
     with open(src_spec + '/sys_disk_size.txt', 'rb') as fin:
         olast_lba = int(fin.read())
 except:
     print("Unable to read disk size file")
-    sys.exit(7)
+    sys.exit(5)
 
-nlast_lba = sysdisk_size
-first_lba = 0
+def part_number(partdev):
+    pseq=''
+    for i in range(-1, -4, -1):
+        digit = partdev[i]
+        if digit < '0' or digit > '9':
+            break
+        pseq = digit + pseq
+    return pseq
+
+label = ''
 odisk = 'x'
 olen = len(odisk)
 with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
@@ -156,7 +191,9 @@ with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
             sfout.write('\n')
             continue
 
-        if fields[0] == 'device:':
+        if fields[0] == 'label:':
+            label = fields[-1]
+        elif fields[0] == 'device:':
             odisk = fields[-1]
             olen = len(odisk)
             fields[-1] = sysdisk
@@ -166,9 +203,9 @@ with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
             olast_lba = int(fields[-1])
             nlast_lba = sysdisk_size - first_lba
             fields[-1] = str(nlast_lba)
-        if fields[0][:olen] == odisk:
-            pseq = fields[0][-1]
-            fields[0] = sysdisk+part+pseq
+        elif fields[0][:olen] == odisk:
+            pseq = part_number(fields[0])
+            fields[0] = sysdisk+partprefix+pseq
             idx = 0
             size_idx = 0
             pstart = 0
@@ -180,7 +217,7 @@ with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
                     psize = int(fields[idx+1][:-1])
                     size_idx = idx + 1
                 idx += 1
-            if pstart + psize + 2048 > olast_lba:
+            if pstart + psize >= olast_lba + 2049:
                 psize = nlast_lba - pstart
                 fields[size_idx] = str(psize) + ','
 
@@ -191,23 +228,81 @@ with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
         sfout.write('\n')
 
 sfout.close()
+
+if len(sys.argv) > 4:
+    osysparts = src_spec + '/sys_disk_partitions.txt'
+    sysparts = sys.argv[4]
+else:
+    sys.exit(0)
+
+if not os.path.isfile(osysparts):
+    print("Clone image missing file: {}".format(osysparts))
+    sys.exit(1)
+
+try:
+    sfout = open(sysparts, "w")
+except:
+    print("Cannot open file: {}".format(sysparts))
+    exit(5)
+
+with open(osysparts, "r") as fin:
+    for ln in fin:
+        fields = ln.split()
+        if len(fields) == 0:
+            sfout.write('\n')
+        opart = fields[0][:-1]
+        pseq = part_number(opart)
+        fields[0] = sysdisk + partprefix + pseq + ':'
+        for field in fields:
+            sfout.write(field)
+            if field != fields[-1]:
+                sfout.write(' ')
+        sfout.write('\n')
+sfout.close()
+
 sys.exit(0)
 EOD
 	chmod +x tweak_sfdisk.py
 }
 #
+#  set up bootstrap
+#
+function bootstrap_setup()
+{
+	local srcpath target mbrf
+
+	srcpath=$1
+	target=$2
+	mbrf=$(basename $target)
+	eval $(sudo blkid $target | cut -d: -f2)
+	if [ "$PTTYPE" == "dos" ]
+	then
+		sudo dd if=$target bs=512 count=1 | cat > /tmp/${mbrf}_mbr.dat
+		dd if=$srcpath/grub_code.dat bs=1 count=446 of=/tmp/${mbrf}_mbr.dat \
+			conv=notrunc,nocreat
+		sudo dd if=/tmp/${mbrf}_mbr.dat bs=512 of=$target oflag=direct \
+			conv=nocreat,notrunc
+		sudo dd if=$srcpath/grub_code.dat bs=512 skip=1 of=$target seek=1 \
+			oflag=direct conv=nocreat,notrunc
+	fi
+	if [ $UEFIBOOT -eq 1 ] && ls -ld /sys/firmware/efi > /dev/null 2>&1
+	then
+		sudo efibootmgr -c -d $target -p 1 -L "LIOS" -l '\EFI\debian\shimx64.efi'
+	fi
+}
+#
 function restore_to()
 {
-	local source target
+	local srcpath target device odevice
 
-	source=$1
+	srcpath=$1
 	target=$2
 	echo "Warning: All data on disk $target will be erased!"
-	read -p "Continue?[Y]" confirm
+	read -p "Continue?[N]" confirm
 	[ "x$confirm" != "xY" ] && return
-	echo "Will restore from $source to $target"
+	echo "Will restore from $srcpath to $target"
 	tweak_sfdisk
-	./tweak_sfdisk.py $target $source /tmp/sys_disk_sfdisk.dat
+	./tweak_sfdisk.py $target $srcpath /tmp/sys_disk_sfdisk.dat /tmp/sys_disk_partitions.txt
 	rm tweak_sfdisk.py
 	sudo sfdisk $target < /tmp/sys_disk_sfdisk.dat
 	sudo sync
@@ -216,6 +311,7 @@ function restore_to()
 	do
 		device=${diskpart%:*}
 		eval $label_info
+		echo "Device $device, Type $TYPE, Label $LABEL"
 		case $TYPE in
 		vfat)
 			uuid=${UUID%-*}${UUID#*-}
@@ -227,29 +323,36 @@ function restore_to()
 		xfs)
 			sudo mkfs -t $TYPE -m uuid=$UUID -L $LABEL -f $device
 			;;
+		ext2)
+			sudo mkfs -t $TYPE -L $LABEL -U $UUID $device
+			continue
+			;;
 		*)
 			echo "Unknown file system type: $TYPE"
 			continue
 			;;
 		esac
-		[ "$TYPE" = "swap" ] && continue
+		[ "$TYPE" = "swap" -o "$TYPE" = "ext2" ] && continue
 #
 		sudo mount -t $TYPE $device /mnt
 		pushd /mnt
-		echo "Restoring contents from $source/sys_disk_${LABEL}.cpio ..."
-		sudo cpio -id < $source/sys_disk_${LABEL}.cpio
+		echo "Restoring contents from $srcpath/sys_disk_${LABEL}.cpio ..."
+		sudo cpio -id < $srcpath/sys_disk_${LABEL}.cpio
+		[ "$LABEL" = "LIOS_ESP" -a -f EFI/debian/shimx64.efi ] && \
+			UEFIBOOT=1
 		popd
 		sudo umount /mnt
-	done < $source/sys_disk_partitions.txt
+	done < /tmp/sys_disk_partitions.txt
+	bootstrap_setup $srcpath $target
 }
 #
 # restore LIOS
 #
 function lios_restore()
 {
-	local source dadisks
+	local srcpath dadisks
 
-	source=$1
+	srcpath=$1
 	dadisks=($(ls -l /sys/block|fgrep -v usb|fgrep -v virtual| \
 		grep -E '^l'|awk '{print $9}'))
 	echo "Please select the disk to restore to: "
@@ -261,7 +364,7 @@ function lios_restore()
 			break
 		fi
 		echo "Will use disk $disk as restore target. "
-		restore_to $source /dev/$disk
+		restore_to $srcpath /dev/$disk
 		break
 	done
 }
@@ -280,6 +383,7 @@ case "$action" in
 			echo "No Clone Images to use."
 			exit 3
 		fi
+		UEFIBOOT=0
 		echo "Please select the resotre image: "
 		select from in ${images[@]}
 		do

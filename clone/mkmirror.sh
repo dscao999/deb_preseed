@@ -108,8 +108,8 @@ function setup_legacy()
 {
 	sudo dd if=${device} of=mbr.dat bs=512 count=1
 	sudo dd if=legacy-bios/mbr-boot-code.dat of=mbr.dat bs=1 conv=notrunc
-	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat
-	sudo dd if=legacy-bios/grub-boot-code.dat of=${device} bs=512 seek=1 conv=nocreat
+	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat oflag=direct
+	sudo dd if=legacy-bios/grub-boot-code.dat of=${device} bs=512 seek=1 oflag=direct conv=nocreat
 }
 lineno=121
 tail --lines=+${lineno} ${0} | cpio -id
