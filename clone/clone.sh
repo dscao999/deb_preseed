@@ -217,7 +217,7 @@ with open(src_spec + '/sys_disk_sfdisk.dat', "r") as fin:
                     psize = int(fields[idx+1][:-1])
                     size_idx = idx + 1
                 idx += 1
-            if pstart + psize >= olast_lba + 2049:
+            if pstart + psize >= olast_lba - 2049:
                 psize = nlast_lba - pstart
                 fields[size_idx] = str(psize) + ','
 

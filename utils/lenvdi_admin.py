@@ -14,26 +14,26 @@ citrix_file = '/usr/share/applications/selfservice.desktop'
 vmware_file = '/usr/share/applications/vmware-view.desktop'
 lidcc_file = '/usr/share/applications/lidc-client.desktop'
 
+timeconf = '/etc/systemd/timesyncd.conf'
+
 ovirt_trust = """#!/bin/bash
 #
 ROOTCA=$1
-#cp $ROOTCA /etc/ssl/certs/oVirt_root_ca.pem
+cp $ROOTCA /etc/ssl/certs/oVirt_root_ca.pem
 idxname=$(openssl x509 -noout -in $ROOTCA -subject_hash)
 cd /etc/ssl/certs
 [ -L ${idxname}.0 ] && rm ${idxname}.0
-#ln -s oVirt_root_ca.pem ${idxname}.0
+ln -s oVirt_root_ca.pem ${idxname}.0
 cd -
 echo "Index: ${idxname}.0"
-exit 1
 """
 
 citrix_trust = """#!/bin/bash
 #
 ROOTCA=$1
 ICAROOT=/opt/Citrix/ICAClient
-echo cp $ROOTCA $ICAROOT/keystore/cacerts
-echo $ICAROOT/util/ctx_rehash
-exit 1
+cp $ROOTCA $ICAROOT/keystore/cacerts
+$ICAROOT/util/ctx_rehash
 """
 
 def ca_import(rootca, script):
@@ -49,7 +49,6 @@ def ca_import(rootca, script):
 class CABox(Gtk.Box):
     def __init__(self, rootwin):
         super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
-
         self.rootwin = rootwin
 
         hbox = Gtk.Box(spacing=5)
@@ -132,6 +131,125 @@ class CABox(Gtk.Box):
             dialog.run()
             dialog.destroy()
 
+class TimerBox(Gtk.Box):
+    def __init__(self, rootwin):
+        super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+        self.set_homogeneous(False)
+        self.rootwin = rootwin
+        label = Gtk.Label(label="Time Server Address")
+        label.show()
+        self.pack_start(label, True, True, 0)
+
+        box = Gtk.Box()
+        box.set_homogeneous(False)
+        box.show()
+        self.pack_start(box, True, True, 0)
+
+        vbox1 = Gtk.VBox(spacing=11)
+        vbox1.show()
+        box.pack_start(vbox1, True, True, 0)
+        vbox2 = Gtk.VBox()
+        vbox2.show()
+        box.pack_start(vbox2, False, False, 0)
+
+        self.ip_entry = Gtk.Entry()
+        self.ip_entry.show()
+        vbox1.pack_start(self.ip_entry, False, False, 0)
+        but = Gtk.Button(label="Add")
+        but.connect("clicked", self.add_ip)
+        but.show()
+        vbox2.pack_start(but, False, False, 0)
+
+        self.ip_list = Gtk.ListBox()
+        self.ip_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.ip_list.show()
+        sips = []
+        with open(timeconf, "r") as fin:
+            for ln in fin:
+                recs = ln.split('=')
+                if recs[0] == 'NTP':
+                    sips = recs[1].split()
+                    break
+ 
+        numrow = 0
+        for sip in sips:
+            row = Gtk.ListBoxRow()
+            label = Gtk.Label(label=sip)
+            label.show()
+            row.add(label);
+            row.show()
+            self.ip_list.add(row)
+            numrow += 1
+
+        vbox1.pack_start(self.ip_list, True, True, 0)
+        but = Gtk.Button(label="Remove")
+        but.connect("clicked", self.remove_ip)
+        but.show()
+        vbox2.pack_start(but, False, False, 0)
+
+        but = Gtk.Button(label="Save")
+        but.show()
+        but.connect("clicked", self.save_config)
+        self.pack_start(but, True, True, 0)
+
+    def add_ip(self, but): 
+        ip = self.ip_entry.get_text()
+        if len(ip) == 0:
+            return
+        label = None
+        idx = 0
+        row = self.ip_list.get_row_at_index(idx)
+        while row:
+            label = row.get_children()[0]
+            if ip == label.get_text():
+                break
+            idx += 1
+            row = self.ip_list.get_row_at_index(idx)
+
+        if row:
+            return
+
+        row = Gtk.ListBoxRow()
+        label = Gtk.Label(label=ip)
+        label.show()
+        row.add(label)
+        row.show()
+        self.ip_list.add(row)
+
+    def remove_ip(self, but):
+        sel = self.ip_list.get_selected_row()
+        if sel:
+            self.ip_list.remove(sel)
+
+    def save_config(self, but):
+        ntp_line = ''
+        idx = 0
+        row = self.ip_list.get_row_at_index(idx)
+        while row:
+            label = row.get_children()[0]
+            ip = label.get_text()
+            if len(ntp_line) > 0:
+                ntp_line += ' '
+            ntp_line += ip
+            idx += 1
+            row = self.ip_list.get_row_at_index(idx)
+        print('NTP='+ntp_line)
+        cmd = '\'/^NTP=.*$/s//' + 'NTP=' + ntp_line + '/\''
+        conf = '/etc/systemd/timesyncd.conf'
+        res = subproc.run('sudo -A sed -e ' + cmd + ' ' + conf,
+                shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
+        if res.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self.rootwin,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="CA Import Failed"
+                    )
+            dialog.format_secondary_text(res[1])
+            dialog.run()
+            dialog.destroy()
+
 class MainWin(Gtk.Window):
     def __init__(self):
         super().__init__(title="LENVDI Admin")
@@ -150,11 +268,11 @@ class MainWin(Gtk.Window):
 
         label = Gtk.Label()
         label.set_markup("<big>Set VDI Server Configuration</big>")
-        stack.add_titled(label, "svcset", "VDI Server")
+        stack.add_titled(label, "svcset", "VDI Service")
 
-        label = Gtk.Label()
-        label.set_markup("<big>Set Time Syncronization</big>")
-        stack.add_titled(label, "timesync", "Time Sync")
+        tmbox = TimerBox(self);
+        tmbox.show()
+        stack.add_titled(tmbox, "timerset", "Timer Sync")
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
