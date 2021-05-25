@@ -234,7 +234,7 @@ class TimerBox(Gtk.Box):
             idx += 1
             row = self.ip_list.get_row_at_index(idx)
         print('NTP='+ntp_line)
-        cmd = '\'/^NTP=.*$/s//' + 'NTP=' + ntp_line + '/\''
+        cmd = '\'/^#*NTP=.*$/s//' + 'NTP=' + ntp_line + '/\''
         conf = '/etc/systemd/timesyncd.conf'
         res = subproc.run('sudo -A sed -e ' + cmd + ' ' + conf,
                 shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
@@ -244,11 +244,92 @@ class TimerBox(Gtk.Box):
                     flags=0,
                     message_type=Gtk.MessageType.ERROR,
                     buttons=Gtk.ButtonsType.CANCEL,
-                    text="CA Import Failed"
+                    text="Failed to change /etc/systemd/timesyncd.conf"
                     )
-            dialog.format_secondary_text(res[1])
+            dialog.format_secondary_text(res.stdout)
             dialog.run()
             dialog.destroy()
+
+class VDIBox(Gtk.Box):
+    def __init__(self, rootwin):
+        super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+        self.set_homogeneous(False)
+        self.rootwin = rootwin
+
+        box = Gtk.Box(spacing=6)
+        box.show()
+        self.pack_start(box, True, True, 0)
+        label = Gtk.Label(label="Server Name(FQDN): ")
+        label.show()
+        box.pack_start(label, True, True, 0)
+        self.name_entry = Gtk.Entry()
+        self.name_entry.set_width_chars(24)
+        self.name_entry.show()
+        box.pack_start(self.name_entry, True, True, 0)
+
+        box = Gtk.Box(spacing=6)
+        box.show()
+        self.pack_start(box, True, True, 0)
+        label = Gtk.Label(label="Service IP: ")
+        label.set_max_width_chars(20)
+        label.show()
+        box.pack_start(label, True, True, 0)
+        self.ip_entry = Gtk.Entry()
+        self.ip_entry.set_width_chars(16)
+        self.ip_entry.show()
+        box.pack_start(self.ip_entry, True, True, 0)
+
+        box = Gtk.Box(spacing=6)
+        box.show()
+        self.pack_start(box, True, True, 0)
+        self.dns_chkbox = Gtk.CheckButton(label="Use DNS")
+        self.dns_chkbox.connect("toggled", self.dns_toggled)
+        self.dns_chkbox.set_active(False)
+        self.use_dns = False
+        self.dns_chkbox.show()
+        box.pack_start(self.dns_chkbox, True, True, 0)
+        but = Gtk.Button(label="Save")
+        but.connect("clicked", self.save_service_ip)
+        but.show()
+        box.pack_start(but, True, False, 0)
+
+    def dns_toggled(self, but):
+        if but.get_active():
+            self.use_dns = True
+            self.ip_entry.set_editable(False)
+            self.name_entry.set_editable(False)
+        else:
+            self.use_dns = False
+            self.ip_entry.set_editable(True)
+            self.name_entry.set_editable(True)
+
+    def save_service_ip(self, but):
+        if self.use_dns:
+            return
+        svrname = self.name_entry.get_text()
+        ip = self.ip_entry.get_text()
+        if not svrname or not ip:
+            return
+
+        cmnt = '\'/[0-9].* ' + svrname + '/s/^./#&/\''
+        appnd = '\'$a' + ip + ' ' + svrname + '\''
+        sedcmd = 'sed -e ' + cmnt + ' -e ' + appnd + ' /etc/hosts'
+        print(sedcmd)
+        res = subproc.run('sudo -A ' + sedcmd,
+                shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
+        if res.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self.rootwin,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="Fail to Change /etc/hosts"
+                    )
+            dialog.format_secondary_text(res.stdout)
+            dialog.run()
+            dialog.destroy()
+        print(res.stdout)
+
 
 class MainWin(Gtk.Window):
     def __init__(self):
@@ -266,9 +347,9 @@ class MainWin(Gtk.Window):
         cabox.show()
         stack.add_titled(cabox, "catrust", "Import CA")
 
-        label = Gtk.Label()
-        label.set_markup("<big>Set VDI Server Configuration</big>")
-        stack.add_titled(label, "svcset", "VDI Service")
+        vdibox = VDIBox(self)
+        vdibox.show()
+        stack.add_titled(vdibox, "svcset", "VDI Service")
 
         tmbox = TimerBox(self);
         tmbox.show()
