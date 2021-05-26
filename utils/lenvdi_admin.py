@@ -14,29 +14,7 @@ citrix_file = '/usr/share/applications/selfservice.desktop'
 vmware_file = '/usr/share/applications/vmware-view.desktop'
 lidcc_file = '/usr/share/applications/lidc-client.desktop'
 
-timeconf = '/etc/systemd/timesyncd.conf'
-
-ovirt_trust = """#!/bin/bash
-#
-ROOTCA=$1
-cp $ROOTCA /etc/ssl/certs/
-idxname=$(openssl x509 -noout -in $ROOTCA -subject_hash)
-cd /etc/ssl/certs
-[ -L ${idxname}.0 ] && rm ${idxname}.0
-ln -s $ROOTCA ${idxname}.0
-cd -
-echo "Index: ${idxname}.0"
-"""
-
-citrix_trust = """#!/bin/bash
-#
-ROOTCA=$1
-ICAROOT=/opt/Citrix/ICAClient
-cp $ROOTCA $ICAROOT/keystore/cacerts/
-$ICAROOT/util/ctx_rehash
-"""
-
-def ca_import(rootca, script):
+def ca_import(rootca, client):
     tmpshell = '/tmp/' + 'import_ca.sh'
     with open(tmpshell, "w") as fout:
         fout.write(script)
@@ -353,7 +331,7 @@ class VDIBox(Gtk.Box):
         if not svrname or not ip:
             return
 
-        cmnt = '\'/[0-9].* ' + svrname + '/s/^./#&/\''
+        cmnt = '\'/^[0-9].*[ \t]' + svrname + '/s/^./#&/\''
         appnd = '\'$a' + ip + ' ' + svrname + '\''
         sedcmd = 'sed -i -e ' + cmnt + ' -e ' + appnd + ' /etc/hosts'
         res = subproc.run('sudo -A ' + sedcmd,

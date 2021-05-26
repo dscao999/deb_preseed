@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-TARGS=$(getopt -l client:,rootca:,sname:,sip:,dns -o c:a:s:i:d -- "$@")
+TARGS=$(getopt -l client:,rootca:,sname:,sip:,ntp: -o c:a:s:i:t -- "$@")
 [ $? -ne 0 ] && exit 1
 eval set -- $TARGS
-CLIENT=lidcc
-SNAME=engine.cluster
-SIP=169.1.1.1
+CLIENT=
+SNAME=
+SIP=
 DNS=
 ROOTCA=
 #
-while true; do
+HEND=0
+while [ $HEND -eq 0 ]; do
 	case "$1" in
 	--client)
 		CLIENT=$2
@@ -23,12 +24,16 @@ while true; do
 		SIP=$2
 		shift
 		;;
-	--dns)
-		DNS=1
+	--ntp)
+		NTP=$2
+		shift
 		;;
 	--rootca)
 		ROOTCA=$2
 		shift
+		;;
+	--)
+		HEND=1
 		;;
 	*)
 		echo "Unknown option: $1"
@@ -40,24 +45,14 @@ done
 #
 ACTION=$1
 #
-#  set up environment for service
-#
-function service_set()
-{
-if [ $DNS -eq 0 ]
-then
-	sed -i -e "\$a${SIP}\t${SNAME}" /etc/hosts
-fi
-}
-#
 # Import CA for ovirt
 #
 function ovirt_ca()
 {
-	cp $ROOTCA /etc/ssl/certs/oVirt_rootca.pem
+	cp $ROOTCA /etc/ssl/certs/
 	idxname=$(openssl x509 -noout -in $ROOTCA -subject_hash)
 	cd /etc/ssl/certs
-	ln -s oVirt_rootca.pem ${idxname}.0
+	ln -s ${ROOTCA} ${idxname}.0
 	cd -
 }
 #
@@ -83,22 +78,10 @@ function import_ca()
 #
 	case "$CLIENT" in
 	lidcc)
-		if dpkg --list lidc-client > /dev/null 2>&1
-		then
-			ovirt_ca
-		else
-			echo "No LIDC client is installed."
-			exit 2
-		fi
+		ovirt_ca
 		;;
 	citrix)
-		if dpkg --list icaclient > /dev/null 2>&1
-		then
-			citrix_ca
-		else
-			echo "No Citrix Workspace App is installed."
-			exit 2
-		fi
+		citrix_ca
 		;;
 	*)
 		echo "CA for $CLIENT is not supported now."
@@ -109,10 +92,26 @@ function import_ca()
 
 case "$ACTION" in
 	import_ca)
-		import_ca()
+		import_ca
 		;;
 	time_sync)
+		if [ -z "$NTP" ]
+		then
+			echo "Empty NTP server string."
+			exit 2
+		fi
+		sed -e "/^NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
 		;;
-	set_service)
+	setvdi)
+		if [ -z "$SNAME" -o -z "$SIP" ]
+		then
+			echo "Missing server name, and/or server ip"
+			exit 4
+		fi
+		eval sed -e "'/^[0-9].* [\\t ]${SNAME}/s/^./#&/'" \
+			-e "'\$a${SIP}\\t${SNAME}'" /etc/hosts
 		;;
+	*)
+		echo "Unknown operation: $ACTION"
+		exit 3
 esac
