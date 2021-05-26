@@ -41,7 +41,8 @@ trap abnormal INT
 #
 function lios_clone()
 {
-	clone_dir=clone-$(date "+%m%d%y-%H%M")
+	mac=$(ip l|fgrep link/ether|head -1|awk '{print $2}')
+	clone_dir=clone-${mac}-$(date "+%m%d%y-%H%M")
 	target_dir=$target_base/$clone_dir
 	#
 	sudo blkid | fgrep LIOS_ > /tmp/sys_disk_partitions.txt

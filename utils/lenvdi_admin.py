@@ -19,11 +19,11 @@ timeconf = '/etc/systemd/timesyncd.conf'
 ovirt_trust = """#!/bin/bash
 #
 ROOTCA=$1
-cp $ROOTCA /etc/ssl/certs/oVirt_root_ca.pem
+cp $ROOTCA /etc/ssl/certs/
 idxname=$(openssl x509 -noout -in $ROOTCA -subject_hash)
 cd /etc/ssl/certs
 [ -L ${idxname}.0 ] && rm ${idxname}.0
-ln -s oVirt_root_ca.pem ${idxname}.0
+ln -s $ROOTCA ${idxname}.0
 cd -
 echo "Index: ${idxname}.0"
 """
@@ -32,7 +32,7 @@ citrix_trust = """#!/bin/bash
 #
 ROOTCA=$1
 ICAROOT=/opt/Citrix/ICAClient
-cp $ROOTCA $ICAROOT/keystore/cacerts
+cp $ROOTCA $ICAROOT/keystore/cacerts/
 $ICAROOT/util/ctx_rehash
 """
 
@@ -45,6 +45,16 @@ def ca_import(rootca, script):
     res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT, shell=True, text=True)
     os.remove(tmpshell)
     return (res.returncode, res.stdout)
+
+class EchoInfo(Gtk.MessageDialog):
+    def __init__(self, rootwin, info):
+        super().__init__(parent=rootwin,
+                flags=0,
+                message_type=Gtk.MessageType.INFO,
+                buttons=Gtk.ButtonsType.OK,
+                text=info
+                )
+
 
 class CABox(Gtk.Box):
     def __init__(self, rootwin):
@@ -98,7 +108,27 @@ class CABox(Gtk.Box):
 
     def on_file_selected(self, widget):
         self.cafile = widget.get_filename()
-        if len(self.cafile) > 0 and self.client != 'unknown':
+        if self.cafile and len(self.cafile) > 0 and self.client != 'unknown':
+            if self.client == 'citrix':
+                cadir = '/opt/Citrix/ICAClient/keystore/cacerts/'
+            elif self.client == 'lidcc':
+                cadir = '/etc/ssl/certs/'
+            elif self.client == 'vmware':
+                cadir = '/etc/noexistent/'
+            cafile = os.path.basename(self.cafile)
+            if os.path.isfile(cadir + cafile):
+                dialog = Gtk.MessageDialog(
+                        parent=self.rootwin,
+                        flags=0,
+                        message_type=Gtk.MessageType.WARNING,
+                        buttons=Gtk.ButtonsType.OK_CANCEL,
+                        text="File Already Exists"
+                        )
+                dialog.format_secondary_text('Trusted CA File exits for ' + self.client + ". Overwrite?")
+                resp = dialog.run()
+                dialog.destroy()
+                if resp == Gtk.ResponseType.CANCEL:
+                    return
             self.exbutton.set_sensitive(True)
 
     def on_import_clicked(self, widget):
@@ -118,6 +148,9 @@ class CABox(Gtk.Box):
             dialog.destroy()
             return
 
+        if not os.path.isfile(self.cafile):
+            return
+
         res = ca_import(self.cafile, script)
         if res[0] != 0:
             dialog = Gtk.MessageDialog(
@@ -128,6 +161,10 @@ class CABox(Gtk.Box):
                     text="CA Import Failed"
                     )
             dialog.format_secondary_text(res[1])
+            dialog.run()
+            dialog.destroy()
+        else:
+            dialog = EchoInfo(self.rootwin, "CA Import Success!")
             dialog.run()
             dialog.destroy()
 
@@ -236,7 +273,7 @@ class TimerBox(Gtk.Box):
         print('NTP='+ntp_line)
         cmd = '\'/^#*NTP=.*$/s//' + 'NTP=' + ntp_line + '/\''
         conf = '/etc/systemd/timesyncd.conf'
-        res = subproc.run('sudo -A sed -e ' + cmd + ' ' + conf,
+        res = subproc.run('sudo -A sed -i -e ' + cmd + ' ' + conf,
                 shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
         if res.returncode != 0:
             dialog = Gtk.MessageDialog(
@@ -249,6 +286,11 @@ class TimerBox(Gtk.Box):
             dialog.format_secondary_text(res.stdout)
             dialog.run()
             dialog.destroy()
+        else:
+            dialog = EchoInfo(self.rootwin, "/etc/systemd/timesyncd.conf Changed.")
+            dialog.run()
+            dialog.destroy()
+            subproc.run('sudo -A systemctl restart systemd-timesyncd', shell=True)
 
 class VDIBox(Gtk.Box):
     def __init__(self, rootwin):
@@ -313,8 +355,7 @@ class VDIBox(Gtk.Box):
 
         cmnt = '\'/[0-9].* ' + svrname + '/s/^./#&/\''
         appnd = '\'$a' + ip + ' ' + svrname + '\''
-        sedcmd = 'sed -e ' + cmnt + ' -e ' + appnd + ' /etc/hosts'
-        print(sedcmd)
+        sedcmd = 'sed -i -e ' + cmnt + ' -e ' + appnd + ' /etc/hosts'
         res = subproc.run('sudo -A ' + sedcmd,
                 shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
         if res.returncode != 0:
@@ -328,7 +369,10 @@ class VDIBox(Gtk.Box):
             dialog.format_secondary_text(res.stdout)
             dialog.run()
             dialog.destroy()
-        print(res.stdout)
+        else:
+            dialog = EchoInfo(self.rootwin, "IP and FQDN added to /etc/hosts")
+            dialog.run()
+            dialog.destroy()
 
 
 class MainWin(Gtk.Window):
