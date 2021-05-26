@@ -100,7 +100,7 @@ case "$ACTION" in
 			echo "Empty NTP server string."
 			exit 2
 		fi
-		sed -e "/^NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
+		sed -i -e "/^NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
 		[ $? -eq 0 ] && systemctl restart systemd-timesyncd
 		;;
 	setvdi)
@@ -109,7 +109,7 @@ case "$ACTION" in
 			echo "Missing server name, and/or server ip"
 			exit 4
 		fi
-		eval sed -e "'/^[0-9].* [\\t ]${SNAME}/s/^./#&/'" \
+		eval sed -i -e "'/^[0-9].*[\\t ]${SNAME}/s/^./#&/'" \
 			-e "'\$a${SIP}\\t${SNAME}'" /etc/hosts
 		;;
 	*)

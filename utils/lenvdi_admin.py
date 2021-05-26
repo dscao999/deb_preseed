@@ -15,7 +15,7 @@ lidcc_file = '/usr/share/applications/lidc-client.desktop'
 
 timeconf = '/etc/systemd/timesyncd.conf'
 
-vdiadm = './vdi-admin.sh'
+vdiadm = 'vdi-admin.sh'
 
 def vdi_admin(action, **kargs):
     cmd = 'sudo -A ' + vdiadm
@@ -29,8 +29,9 @@ def vdi_admin(action, **kargs):
         cmd += ' --ntp="' + kargs["ntp"] + '"'
 
     cmd += ' ' + action
-    print("Execute: {}".format(cmd))
-    return (0, "OK")
+    res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
+            shell=True, text=True)
+    return (res.returncode, res.stdout)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -95,26 +96,6 @@ class CABox(Gtk.Box):
     def on_file_selected(self, widget):
         self.cafile = widget.get_filename()
         if self.cafile and len(self.cafile) > 0 and self.client != 'unknown':
-            if self.client == 'citrix':
-                cadir = '/opt/Citrix/ICAClient/keystore/cacerts/'
-            elif self.client == 'lidcc':
-                cadir = '/etc/ssl/certs/'
-            elif self.client == 'vmware':
-                cadir = '/etc/noexistent/'
-            cafile = os.path.basename(self.cafile)
-            if os.path.isfile(cadir + cafile):
-                dialog = Gtk.MessageDialog(
-                        parent=self.rootwin,
-                        flags=0,
-                        message_type=Gtk.MessageType.WARNING,
-                        buttons=Gtk.ButtonsType.OK_CANCEL,
-                        text="File Already Exists"
-                        )
-                dialog.format_secondary_text('Trusted CA File exits for ' + self.client + ". Overwrite?")
-                resp = dialog.run()
-                dialog.destroy()
-                if resp == Gtk.ResponseType.CANCEL:
-                    return
             self.exbutton.set_sensitive(True)
 
     def on_import_clicked(self, widget):
@@ -129,9 +110,29 @@ class CABox(Gtk.Box):
             dialog.run()
             dialog.destroy()
             return
-
         if not os.path.isfile(self.cafile):
             return
+
+        if self.client == 'citrix':
+            cadir = '/opt/Citrix/ICAClient/keystore/cacerts/'
+        elif self.client == 'lidcc':
+            cadir = '/etc/ssl/certs/'
+        elif self.client == 'vmware':
+            cadir = '/etc/noexistent/'
+        cafile = os.path.basename(self.cafile)
+        if os.path.isfile(cadir + cafile):
+            dialog = Gtk.MessageDialog(
+                    parent=self.rootwin,
+                    flags=0,
+                    message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text="File Already Exists"
+                    )
+            dialog.format_secondary_text('Trusted CA File exits for ' + self.client + ". Overwrite?")
+            resp = dialog.run()
+            dialog.destroy()
+            if resp == Gtk.ResponseType.CANCEL:
+                    return
 
         res = vdi_admin("import_ca", client=self.client, rootca=self.cafile)
         if res[0] != 0:
@@ -330,6 +331,25 @@ class VDIBox(Gtk.Box):
         if not svrname or not ip:
             return
 
+        with open("/etc/hosts", "r") as fin:
+            for ln in fin:
+                recs = ln.split()
+                if len(recs) == 0 or recs[0][0] == '#':
+                    continue
+                if recs[1] and recs[1] == svrname:
+                    dialog = Gtk.MessageDialog(
+                            parent=self.rootwin,
+                            flags=0,
+                            message_type=Gtk.MessageType.WARNING,
+                            buttons=Gtk.ButtonsType.OK_CANCEL,
+                            text=svrname + "Already exits"
+                            )
+                    dialog.format_secondary_text("Overwrite It?")
+                    resp = dialog.run()
+                    dialog.destroy()
+                    if resp == Gtk.ResponseType.CANCEL:
+                        return
+                
         res = vdi_admin('setvdi', sname=svrname, sip=ip)
         if res[0] != 0:
             dialog = Gtk.MessageDialog(
