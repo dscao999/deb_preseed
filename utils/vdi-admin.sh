@@ -101,6 +101,7 @@ case "$ACTION" in
 			exit 2
 		fi
 		sed -e "/^NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
+		[ $? -eq 0 ] && systemctl restart systemd-timesyncd
 		;;
 	setvdi)
 		if [ -z "$SNAME" -o -z "$SIP" ]

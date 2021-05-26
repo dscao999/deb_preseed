@@ -3,7 +3,6 @@
 import os
 import subprocess as subproc
 import gi
-import configparser
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -14,15 +13,24 @@ citrix_file = '/usr/share/applications/selfservice.desktop'
 vmware_file = '/usr/share/applications/vmware-view.desktop'
 lidcc_file = '/usr/share/applications/lidc-client.desktop'
 
-def ca_import(rootca, client):
-    tmpshell = '/tmp/' + 'import_ca.sh'
-    with open(tmpshell, "w") as fout:
-        fout.write(script)
-    os.chmod(tmpshell, 0o755)
-    cmd = 'sudo -A ' + tmpshell + ' ' + rootca
-    res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT, shell=True, text=True)
-    os.remove(tmpshell)
-    return (res.returncode, res.stdout)
+timeconf = '/etc/systemd/timesyncd.conf'
+
+vdiadm = './vdi-admin.sh'
+
+def vdi_admin(action, **kargs):
+    cmd = 'sudo -A ' + vdiadm
+    if action == 'import_ca':
+        cmd += ' --client=' + kargs["client"]
+        cmd += ' --rootca=' + kargs["rootca"]
+    elif action == 'setvdi':
+        cmd += ' --sname=' + kargs["sname"]
+        cmd += ' --sip=' + kargs["sip"]
+    elif action == 'time_sync':
+        cmd += ' --ntp="' + kargs["ntp"] + '"'
+
+    cmd += ' ' + action
+    print("Execute: {}".format(cmd))
+    return (0, "OK")
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -110,11 +118,7 @@ class CABox(Gtk.Box):
             self.exbutton.set_sensitive(True)
 
     def on_import_clicked(self, widget):
-        if self.client == 'lidcc':
-            script = ovirt_trust
-        elif self.client == 'citrix':
-            script = citrix_trust
-        else:
+        if self.client != 'lidcc' and self.client != 'citrix':
             dialog = Gtk.MessageDialog(
                     parent=self.rootwin,
                     flags=0,
@@ -129,7 +133,7 @@ class CABox(Gtk.Box):
         if not os.path.isfile(self.cafile):
             return
 
-        res = ca_import(self.cafile, script)
+        res = vdi_admin("import_ca", client=self.client, rootca=self.cafile)
         if res[0] != 0:
             dialog = Gtk.MessageDialog(
                     parent=self.rootwin,
@@ -248,12 +252,8 @@ class TimerBox(Gtk.Box):
             ntp_line += ip
             idx += 1
             row = self.ip_list.get_row_at_index(idx)
-        print('NTP='+ntp_line)
-        cmd = '\'/^#*NTP=.*$/s//' + 'NTP=' + ntp_line + '/\''
-        conf = '/etc/systemd/timesyncd.conf'
-        res = subproc.run('sudo -A sed -i -e ' + cmd + ' ' + conf,
-                shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
-        if res.returncode != 0:
+        res = vdi_admin('time_sync', ntp=ntp_line)
+        if res[0] != 0:
             dialog = Gtk.MessageDialog(
                     parent=self.rootwin,
                     flags=0,
@@ -261,14 +261,13 @@ class TimerBox(Gtk.Box):
                     buttons=Gtk.ButtonsType.CANCEL,
                     text="Failed to change /etc/systemd/timesyncd.conf"
                     )
-            dialog.format_secondary_text(res.stdout)
+            dialog.format_secondary_text(res[1])
             dialog.run()
             dialog.destroy()
         else:
             dialog = EchoInfo(self.rootwin, "/etc/systemd/timesyncd.conf Changed.")
             dialog.run()
             dialog.destroy()
-            subproc.run('sudo -A systemctl restart systemd-timesyncd', shell=True)
 
 class VDIBox(Gtk.Box):
     def __init__(self, rootwin):
@@ -331,12 +330,8 @@ class VDIBox(Gtk.Box):
         if not svrname or not ip:
             return
 
-        cmnt = '\'/^[0-9].*[ \t]' + svrname + '/s/^./#&/\''
-        appnd = '\'$a' + ip + ' ' + svrname + '\''
-        sedcmd = 'sed -i -e ' + cmnt + ' -e ' + appnd + ' /etc/hosts'
-        res = subproc.run('sudo -A ' + sedcmd,
-                shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
-        if res.returncode != 0:
+        res = vdi_admin('setvdi', sname=svrname, sip=ip)
+        if res[0] != 0:
             dialog = Gtk.MessageDialog(
                     parent=self.rootwin,
                     flags=0,
@@ -344,7 +339,7 @@ class VDIBox(Gtk.Box):
                     buttons=Gtk.ButtonsType.CANCEL,
                     text="Fail to Change /etc/hosts"
                     )
-            dialog.format_secondary_text(res.stdout)
+            dialog.format_secondary_text(res[1])
             dialog.run()
             dialog.destroy()
         else:
