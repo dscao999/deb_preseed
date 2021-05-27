@@ -173,4 +173,10 @@ for entry in entries:
         pout.close()
         shutil.copyfile(tmpf, pkgfile)
 
+dists = isotop + '/dists/lenvdi/'
+relfile = dists + 'Release'
+if not os.path.isfile(relfile):
+    print("Missing Release file: {}".format(reffile))
+    sys.exit(8)
+
 sys.exit(0)

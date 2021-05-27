@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+TARGS=$(getopt -l mirror:,arch:,verbose,poweroff -o m:a:vp -- "$@")
+[ $? -ne 0 ] && exit 1
+#
+HOST=ftp.us.debian.org
+ARCH=amd64
+VERBOSE=0
+POWEROFF=0
+eval set -- $TARGS
+while true; do
+	case "$1" in
+	"--mirror")
+		HOST=$2
+		shift
+		;;
+	"--arch")
+		ARCH=$2
+		shift
+		;;
+	"--verbose")
+		VERBOSE=1
+		;;
+	"--poweroff")
+		POWEROFF=1;
+		;;
+	"--")
+		shift
+		break
+		;;
+	esac
+	shift
+done
+#
+gpg --no-default-keyring --keyring trustedkeys.gpg --import /usr/share/keyrings/debian-archive-keyring.gpg
+#
+# Known hosts of debian mirrors
+#
+#HOST=ftp.us.debian.org
+#HOST=ftp2.cn.debian.org
+#HOST=ftp.us.debian.org
+#HOST=mirrors.tuna.tsinghua.edu.cn
+#HOST=mirrors.ustc.edu.cn
+#HOST=mirrors.163.com
+#HOST=mirrors.huaweicloud.com
+#DIST=buster,buster-updates,buster-backports
+#
+# regularly used arch
+#
+#ARCH=amd64,arm64,armhf
+#
+DEST=/var/www/html/debian
+#DEST=/var/debmirror
+[ $VERBOSE -eq 1 ] && VERBOSE="--verbose --progress"
+#
+if ! mountpoint -q ${DEST}
+then
+	echo "${DEST} is not a mount point."
+	exit 5
+fi
+#
+DIST=buster,buster-backports,buster-updates
+debmirror ${DEST} --host=${HOST} --method=http \
+	--root=/debian --dist=${DIST} --di-dist=buster --di-arch=${ARCH} \
+	--section=main,contrib,non-free --i18n --arch=${ARCH} \
+	--nosource --postcleanup $VERBOSE
+if [ $POWEROFF -eq 1 ]
+then
+	sudo systemctl poweroff
+fi
