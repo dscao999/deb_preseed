@@ -52,7 +52,7 @@ function ovirt_ca()
 	cp $ROOTCA /etc/ssl/certs/
 	idxname=$(openssl x509 -noout -in $ROOTCA -subject_hash)
 	cd /etc/ssl/certs
-	ln -s ${ROOTCA} ${idxname}.0
+	ln -s $(basename ${ROOTCA}) ${idxname}.0
 	cd -
 }
 #
@@ -110,7 +110,7 @@ case "$ACTION" in
 			exit 4
 		fi
 		eval sed -i -e "'/^[0-9].*[\\t ]${SNAME}/s/^./#&/'" \
-			-e "'\$a${SIP}\\t${SNAME}'" /etc/hosts
+			-e "'\$a#\n${SIP}\\t${SNAME}'" /etc/hosts
 		;;
 	*)
 		echo "Unknown operation: $ACTION"
