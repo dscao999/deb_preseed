@@ -1,4 +1,5 @@
 debs/
 tmp/
+__pycache__/
 *.img
 .*.swp
