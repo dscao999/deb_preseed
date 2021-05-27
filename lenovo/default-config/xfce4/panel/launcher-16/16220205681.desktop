@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VDI Admin
+Comment=Lenovo VDI Administration
+Exec=lenvdi_admin.py
+Icon=/usr/share/icons/vendor/512x512/mechanical-gear-1.png
+Terminal=false
+StartupNotify=false
+X-XFCE-Source=file:///usr/share/applications/vdi-admin.desktop
+Path=/home/lenovo

@@ -375,10 +375,12 @@ class MainWin(Gtk.Window):
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(vbox)
+        vbox.show()
 
         stack = Gtk.Stack()
         stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         stack.set_transition_duration(1000)
+        stack.show()
 
         cabox = CABox(self)
         cabox.show()
@@ -394,12 +396,13 @@ class MainWin(Gtk.Window):
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)
+        stack_switcher.show()
 
         vbox.pack_start(stack_switcher, True, True, 0)
         vbox.pack_start(stack, True, True, 0)
 
 win = MainWin()
 win.connect("destroy", Gtk.main_quit)
-win.show_all()
+win.show()
 Gtk.main()
 quit(0)
