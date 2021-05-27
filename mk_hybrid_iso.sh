@@ -117,20 +117,20 @@ nontp=no
 mirror=
 splash=
 rootdisk=
-rootca=
+themes=
 myclient=lidcc
-TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client:,rootca: \
+TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client:,themes: \
 	-o m:s:r:t:np:c:a: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
-		--rootca)
-			rootca="$2"
-			if [ ! -f $rootca -o ! -r $rootca ]
+		--themes)
+			themes="$2"
+			if [ ! -f $themes -o ! -r $themes ]
 			then
-				echo "ROOT CA \"$rootca\" cannot be read."
+				echo "Themes package \"$themes\" cannot be read."
 				exit 2
 			fi
 			shift
@@ -238,7 +238,7 @@ case "${myclient}" in
 		exit 1
 esac
 sed -i -e "s/post-task.sh lidcc\$/post-task.sh $myclient/" ${dstdir}/preseed-debian.cfg
-[ -n "$rootca" ] && chmod u+w ${dstdir}/lenovo && cp $rootca ${dstdir}/lenovo/rootca.pem
+[ -n "$themes" ] && chmod u+w ${dstdir}/lenovo && cp $themes ${dstdir}/lenovo/themes.deb
 #
 if [ $TOUSB -eq 1 ]
 then

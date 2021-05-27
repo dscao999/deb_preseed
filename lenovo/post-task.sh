@@ -33,7 +33,7 @@ mkdir $TARGET/var/log/journal
 xfce_def=/cdrom/lenovo/default-desktop.tar.xz
 xfce_empty=/cdrom/lenovo/empty-desktop.tar.xz
 icaclient=/cdrom/lenovo/icaclient.tar.xz
-rootca=/cdrom/lenovo/rootca.pem
+themes=/cdrom/lenovo/themes.deb
 if [ -f $xfce_def -a -d $TARGET/home/lenovo ]
 then
 	[ -f $xfce_empty ] && cp $xfce_empty $TARGET/home/lenovo
@@ -44,7 +44,7 @@ fi
 vminst=/cdrom/pool/lenvdi/VMware-Horizon-Client.x64.bundle
 [ -f $vminst ] && cp $vminst $TARGET/home/lenovo && \
 	chmod +x $TARGET/home/lenovo/VMware-Horizon-Client.x64.bundle
-[ -f $rootca ] && cp $rootca $TARGET/home/lenovo
+[ -f $themes ] && cp $themes $TARGET/home/lenovo
 #
 # copy ttyS0 login service, to fix baud at 115200
 #
@@ -129,6 +129,7 @@ xfce_def=/home/lenovo/default-desktop.tar.xz
 xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
 vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
+themes=/home/lenovo/themes.deb
 if [ $vmhorizon -eq 1 ]
 then
 	install_vmhorizon $vminstf
@@ -204,6 +205,11 @@ then
 	systemctl enable serial-getty@ttyS0.service
 fi
 #
+if [ -f $themes ]
+then
+	dpkg --install $themes && rm $themes
+fi
+#
 rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 appdesk=/usr/share/applications
@@ -218,12 +224,6 @@ then
 	icaroot=/opt/Citrix/ICAClient
 	[ -w ${icaroot}/config/module.ini ] && \
 	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' ${icaroot}/config/module.ini
-	if [ -f /home/lenovo/rootca.pem ]
-	then
-		cp /home/lenovo/rootca.pem ${icaroot}/keystore/cacerts/
-		${icaroot}/util/ctx_rehash
-		rm -f /home/lenovo/rootca.pem
-	fi
 	[ -r $autoapp ] && cp $autoapp /home/$auto_user/.config/autostart/
 #
 elif [ -r $appdesk/vmware-view.desktop ]
@@ -233,14 +233,6 @@ then
 #
 elif dpkg --list lidc-client
 then
-	if [ -f /home/lenovo/rootca.pem ]
-	then
-		cp /home/lenovo/rootca.pem /etc/ssl/certs/oVirt-rootca.pem
-		pushd /etc/ssl/certs
-		index=$(openssl x509 -noout -hash -in oVirt-rootca.pem)
-		ln -s oVirt-rootca.pem ${index}.0
-		popd
-	fi
 	if [ -r $appdesk/lidc-client.desktop ]
 	then
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/autostart/
@@ -257,6 +249,10 @@ then
 	swapoff $swapdev
 	mkswap -f --label LIOS_SWAP $set_uuid $swapdev
 fi
+#
+# modify /etc/fstab so that /boot and /boot/efi are mounted readonly
+#
+sed -i -e '/boot[ \t]/s/defaults/ro,&/' -e '/boot\/efi/s/umask=0077/ro,&/' /etc/fstab
 wait
 plymouth-set-default-theme -R lenvdi
 update-grub2

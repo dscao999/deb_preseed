@@ -401,8 +401,24 @@ class MainWin(Gtk.Window):
         vbox.pack_start(stack_switcher, True, True, 0)
         vbox.pack_start(stack, True, True, 0)
 
+try:
+    fd = os.open("/run/lock/lenvdi_admin.lock", os.O_WRONLY|os.O_CREAT|os.O_EXCL)
+except:
+    win = Gtk.Window()
+    dialog = Gtk.MessageDialog(parent=win,
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Another instance is already running"
+            )
+    dialog.run()
+    dialog.destroy()
+    quit(2)
+os.close(fd)
+
 win = MainWin()
 win.connect("destroy", Gtk.main_quit)
 win.show()
 Gtk.main()
+os.remove("/run/lock/lenvdi_admin.lock")
 quit(0)
