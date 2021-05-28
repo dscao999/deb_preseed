@@ -50,7 +50,39 @@ gpg --no-default-keyring --keyring trustedkeys.gpg --import /usr/share/keyrings/
 #ARCH=amd64,arm64,armhf
 #
 DEST=/var/www/html/debian
-#DEST=/var/debmirror
+carch="${ARCH//,/ }"
+incon=0
+for march in $(ls -d $DEST/dists/buster/main/binary-*)
+do
+	sarch=${march##*-}
+	[ "$sarch" = "all" ] && continue
+	missing=1
+	for narch in $carch
+	do
+		if [ "$sarch" == "$narch" ]
+		then
+			missing=0
+			break
+		fi
+	done
+	if [ $missing -eq 1 ]
+	then
+		echo "Arch \"$sarch\" from last run is misssing from current selection."
+		incon=1
+	fi
+done
+if [ $incon -eq 1 ]
+then
+	echo "Some archs from last run is missing from current selection."
+	read -p "Continue? " ans
+	if [ "x$ans" != "xY" ]
+	then
+		exit 5
+	fi
+	echo "Will continue updating using current selection."
+	echo "	Some archs will be erased!"
+fi
+#
 [ $VERBOSE -eq 1 ] && VERBOSE="--verbose --progress"
 #
 if ! mountpoint -q ${DEST}
