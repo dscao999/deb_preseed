@@ -88,6 +88,19 @@ exit 0
 #
 # one time task after installation
 #
+install_vmhorizon ()
+{
+	bundle=$1
+	if [ ! -x $bundle ]
+	then
+		echo "Cannot execute $bundle"
+		return 1
+	fi
+	export TERM=dumb
+	export VMWARE_EULAS_AGREED=yes
+	$bundle --console --required
+}
+#
 purge_libreoffice ()
 {
 	apt-get -y purge libreoffice-core libreoffice-common mythes-en-us uno-libs3 ure
@@ -103,19 +116,16 @@ purge_libreoffice ()
 			apt-get -y autoremove
 		fi
 	fi
-}
-
-install_vmhorizon ()
-{
-	bundle=$1
-	if [ ! -x $bundle ]
+	echo "Purge Complete!, vmhorizon: $vmhorizon"
+	if [ $vmhorizon -eq 1 ]
 	then
-		echo "Cannot execute $bundle"
-		return 1
+		install_vmhorizon $vminstf
 	fi
-	export TERM=dumb
-	export VMWARE_EULAS_AGREED=yes
-	$bundle --console --required
+	if [ -f $themes ]
+	then
+		echo "Install $themes"
+		dpkg --install $themes && rm $themes
+	fi
 }
 #
 vmhorizon=0
@@ -123,17 +133,13 @@ vmhorizon=0
 exec 1> /home/lenovo/rc-local.log 2>&1
 #set -x
 #
-purge_libreoffice &
-#
 xfce_def=/home/lenovo/default-desktop.tar.xz
 xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
 vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
 themes=/home/lenovo/themes.deb
-if [ $vmhorizon -eq 1 ]
-then
-	install_vmhorizon $vminstf
-fi
+#
+purge_libreoffice &
 #
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
@@ -205,15 +211,24 @@ then
 	systemctl enable serial-getty@ttyS0.service
 fi
 #
-if [ -f $themes ]
+appdesk=/usr/share/applications
+defdesk=xfce4/panel/launcher-19/16221051582.desktop
+usrdesk=xfce4/panel/launcher-10/16209940802.desktop
+swapdev=$(swapon -s | fgrep /dev | awk '{print $1}')
+if [ -b $swapdev ]
 then
-	dpkg --install $themes && rm $themes
+	eval $(blkid $swapdev|cut -d: -f2)
+	set_uuid=
+	[ -n "$UUID" ] && set_uuid="--uuid $UUID"
+	swapoff $swapdev
+	mkswap -f --label LIOS_SWAP $set_uuid $swapdev
 fi
 #
-rm -f $vminstf $icaclient $xfce_empty $xfce_def
+# modify /etc/fstab so that /boot and /boot/efi are mounted readonly
 #
-appdesk=/usr/share/applications
-usrdesk=xfce4/panel/launcher-10/16209940802.desktop
+sed -i -e '/boot[ \t]/s/defaults/ro,&/' -e '/boot\/efi/s/umask=0077/ro,&/' /etc/fstab
+#
+wait
 if dpkg --list icaclient
 then
 	autoapp=$appdesk/selfservice.desktop
@@ -230,6 +245,7 @@ elif [ -r $appdesk/vmware-view.desktop ]
 then
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/autostart/
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/$usrdesk
+	cp $appdesk/vmware-view.desktop /home/lenovo/.config/$defdesk
 #
 elif dpkg --list lidc-client
 then
@@ -237,23 +253,11 @@ then
 	then
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/autostart/
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/$usrdesk
+		cp $appdesk/lidc-client.desktop /home/lenovo/.config/$defdesk
 	fi
 fi
+rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
-swapdev=$(swapon -s | fgrep /dev | awk '{print $1}')
-if [ -b $swapdev ]
-then
-	eval $(blkid $swapdev|cut -d: -f2)
-	set_uuid=
-	[ -n "$UUID" ] && set_uuid="--uuid $UUID"
-	swapoff $swapdev
-	mkswap -f --label LIOS_SWAP $set_uuid $swapdev
-fi
-#
-# modify /etc/fstab so that /boot and /boot/efi are mounted readonly
-#
-sed -i -e '/boot[ \t]/s/defaults/ro,&/' -e '/boot\/efi/s/umask=0077/ro,&/' /etc/fstab
-wait
 plymouth-set-default-theme -R lenvdi
 update-grub2
 #
