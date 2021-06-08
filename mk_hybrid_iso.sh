@@ -2,7 +2,7 @@
 #
 if ! sudo ls /etc > /dev/null 2>&1
 then
-	echo "sudo failed. sudo without password is required for this operation."
+	echo "sudo failed. sudo privilege  is required for this operation."
 	exit 1
 fi
 #
@@ -116,10 +116,9 @@ pass=P@ssw0rd
 nontp=no
 mirror=
 splash=
-rootdisk=
 themes=
 myclient=lidcc
-TARGS=$(getopt -l mirror:,splash:,rootdisk:,ntp:,nontp,pass:,client:,themes: \
+TARGS=$(getopt -l mirror:,splash:,ntp:,nontp,pass:,client:,themes: \
 	-o m:s:r:t:np:c:a: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
@@ -148,10 +147,6 @@ do
 			;;
 		--ntp)
 			ntpsvr=$2
-			shift
-			;;
-		--rootdisk)
-			rootdisk=$2
 			shift
 			;;
 		--mirror)
@@ -187,15 +182,13 @@ else
 	TOUSB=1
 fi
 wdir=${PWD}
-[ "${rootdisk}" = "/dev/sda" ] && rootdisk=
 [ "${mirror}" = "mirrors.ustc.edu.cn" ] && mirror=
-[ -n "${rootdisk}" ] && srootdisk="s# /dev/sda\$# ${rootdisk}#"
 [ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
 [ -n "${ntpsvr}" ] && sntpsvr="s#cn\\.pool\\.ntp\\.org\$#${ntpsvr}#"
 [ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 
-fln=252
+fln=244
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -209,7 +202,6 @@ if [ -n "$splash" -a -f "$splash" ]
 then
 	cp $splash ${dstdir}/isolinux/splash.png
 fi
-[ -n "${srootdisk}" ] && sed -i -e "$srootdisk" ${dstdir}/preseed-debian.cfg
 [ -n "${shttphost}" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
 [ -n "${snontp}" ] && sed -i -e "$snontp" ${dstdir}/preseed-debian.cfg
 chmod u+w ${dstdir}/lenovo ${dstdir}/lenovo/post-task.sh

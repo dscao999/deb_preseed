@@ -3,7 +3,6 @@
 import sys, os, os.path, stat
 import shutil, hashlib
 import subprocess
-import argparse
 
 import manipkg
 
@@ -117,15 +116,11 @@ if len(sys.argv) < 3:
     print("Usage: {} debdir isodir".format(sys.argv[0]))
     sys.exit(1)
 
-parser = argparse.ArgumentParser(description="Process .deb into Debian respository")
-parser.add_argument('--arch', default='amd64', help='The package architecture type')
-parser.add_argument('debdir', help='The directory where .deb file are stored')
-parser.add_argument('isotop', help='The top directory of an ISO tree')
-
-args = parser.parse_args()
-debdir = args.debdir
-isotop = args.isotop
-
+debdir = sys.argv[1]
+isotop = sys.argv[2]
+arch = 'amd64'
+if len(sys.argv) > 3:
+    arch = sys.argv[3]
 
 if not os.path.isdir(debdir):
     print("{} is not a directory!".format(debdir))
@@ -149,7 +144,7 @@ isopool = isotop + '/pool/lenvdi'
 if not os.path.isdir(isopool):
     os.chmod(isotop+'/pool', fmode)
     os.makedirs(isopool)
-isodist = isotop + '/dists/lenvdi/main/binary-' + args.arch
+isodist = isotop + '/dists/lenvdi/main/binary-' + arch
 if not os.path.isdir(isodist):
     os.chmod(isotop+'/dists', fmode)
     os.makedirs(isodist)
@@ -172,11 +167,5 @@ for entry in entries:
         pout.write('\n')
         pout.close()
         shutil.copyfile(tmpf, pkgfile)
-
-dists = isotop + '/dists/lenvdi/'
-relfile = dists + 'Release'
-if not os.path.isfile(relfile):
-    print("Missing Release file: {}".format(reffile))
-    sys.exit(8)
 
 sys.exit(0)
