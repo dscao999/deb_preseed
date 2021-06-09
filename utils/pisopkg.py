@@ -40,8 +40,7 @@ if len(sys.argv) < 2:
 else:
     isotop = sys.argv[1]
 
-while isotop[-1] == '/':
-    isotop = isotop[:-1]
+isotop = isotop.rstrip('/')
 print(f'ISOTOP: {isotop}')
 #
 # check if this is an ISO top
@@ -124,5 +123,49 @@ for deb_entry in deb_entries:
         for ln in pkg_desc:
             fout.write(ln+'\n')
         fout.write('\n')
+
+relfile = isotop + '/dists/lenvdi/Release'
+if not os.path.isfile(relfile):
+    print(f'Mising Release file {relfile}')
+    syse.exit(5)
+
+rel_prefix = isotop + '/dists/lenvdi/'
+with open(relfile, "r") as fin:
+    phrase = 0
+    content = []
+    for ln in fin:
+        onsum = 0
+        ln = ln.rstrip('\n')
+        if ln[:7] == 'MD5Sum:':
+            phrase = 5
+            onsum = 1
+        elif ln[:7] == 'SHA256:':
+            phrase = 256
+            onsum = 1
+        if phrase == 0 or onsum == 1:
+            content.append(ln)
+            continue
+
+        fields = ln.split()
+        fname = rel_prefix + fields[2]
+        fstat = os.stat(fname)
+        fields[1] = fstat.st_size
+        if phrase == 5:
+            md5 = hashlib.md5()
+            with open(fname, "rb") as hsin:
+                for bln in hsin:
+                    md5.update(bln)
+            fields[0] = md5.hexdigest()
+        elif phrase == 256:
+            sha256 = hashlib.sha256()
+            with open(fname, "rb") as hsin:
+                for bln in hsin:
+                    sha256.update(bln)
+            fields[0] = sha256.hexdigest()
+        content.append(' ' + fields[0] + f'{fields[1]:9d}' + ' ' + fields[2])
+
+with open(relfile, "w") as fout:
+    for ln in content:
+        fout.write(ln + '\n')
 
 sys.exit(0)
