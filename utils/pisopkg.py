@@ -60,7 +60,9 @@ dists = isotop + '/dists/lenvdi/main/'
 if not os.path.isdir(dists):
     print(f'Directory {dists} does not exist.')
     sys.exit(2)
-os.chmod(dists, stat.S_IRWXU)
+ost = os.stat(dists);
+if ost.st_mode != (ost.st_mode|stat.S_IRWXU):
+    os.chmod(dists, stat.S_IRWXU|ost.st_mode);
 
 rel_pool = 'pool/lenvdi/'
 pool = isotop + '/pool/lenvdi/'
@@ -126,8 +128,8 @@ for deb_entry in deb_entries:
 
 relfile = isotop + '/dists/lenvdi/Release'
 if not os.path.isfile(relfile):
-    print(f'Mising Release file {relfile}')
-    syse.exit(5)
+    print(f'Missing Release file {relfile}')
+    sys.exit(5)
 
 rel_prefix = isotop + '/dists/lenvdi/'
 with open(relfile, "r") as fin:

@@ -92,9 +92,9 @@ then
 fi
 #
 DIST=buster,buster-backports,buster-updates
-debmirror ${DEST} --host=${HOST} --method=http \
+debmirror ${DEST} --host=${HOST} --method=http --getcontents \
 	--root=/debian --dist=${DIST} --di-dist=buster --di-arch=${ARCH} \
-	--section=main,contrib,non-free --i18n --arch=${ARCH} \
+	--section=main,contrib,non-free,main/debian-installer --i18n --arch=${ARCH} \
 	--nosource --postcleanup $VERBOSE
 if [ $POWEROFF -eq 1 ]
 then

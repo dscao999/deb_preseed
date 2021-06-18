@@ -100,7 +100,7 @@ case "$ACTION" in
 			echo "Empty NTP server string."
 			exit 2
 		fi
-		sed -i -e "/^NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
+		sed -i -e "/^#*NTP=.*\$/s//NTP=$NTP/" /etc/systemd/timesyncd.conf
 		[ $? -eq 0 ] && systemctl restart systemd-timesyncd
 		;;
 	setvdi)
