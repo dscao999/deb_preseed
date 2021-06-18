@@ -119,7 +119,7 @@ for deb_entry in deb_entries:
 
     binary = dists + 'binary-' + arch
     if not os.path.isdir(binary):
-        os.mkdir(binary)
+        os.mkdir(binary, 0o755)
     pkgfile = binary + '/Packages'
     with open(pkgfile, "a") as fout:
         for ln in pkg_desc:

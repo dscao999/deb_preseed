@@ -13,7 +13,7 @@ then
 	exit 2
 fi
 hostip=$2
-host=http://$2/debian/lenovo
+host=http://$2/lenvdi/lenovo
 #
 TARGET=/target
 [ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
@@ -70,7 +70,7 @@ fi
 #
 # change apt sources.list
 #
-debline="deb [allow-insecure=yes arch=amd64,all] http://$hostip/debian lenvdi main"
+debline="deb [allow-insecure=yes arch=amd64,all] http://$hostip/lenvdi lenvdi main"
 sed -i -e "\$a${debline}" $TARGET/etc/apt/sources.list
 #
 # set EFI ESP label to LIOS_ESP
