@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+have_depot=0
+udisks=($(ls -l /sys/block|fgrep /usb|cut -d'>' -f2))
+for udsk in ${udisks[@]}
+do
+	disk=/dev/$(basename $udsk)
+	if [ ! -b ${disk}3 ]
+	then
+		continue
+	fi
+	if blkid ${disk}3 | fgrep DEBIAN_DEPOT > /dev/null 2>&1
+	then
+		have_depot=1
+		break
+	fi
+done
+if [ $have_depot -eq 1 ]
+then
+	if mount | fgrep ${disk}3 > /dev/null 2>&1
+	then
+		umount ${disk}3
+	fi
+	mount ${disk}3 /var/www/html/debian
+else
+	echo "No Debian Depot."
+fi
+#
+#  wait for network online
+#
+while ! journalctl -b | fgrep "Reached target Network is Online" > /dev/null
+do
+	sleep 1
+done
+#
+hit=0
+for nic in $(ls /sys/class/net)
+do
+	type=$(cat /sys/class/net/$nic/type)
+	if [ $type -eq 1 ]
+	then
+		ipaddr=$(ip addr show dev $nic|fgrep "inet "|awk '{print $2}')
+		if [ -n "$ipaddr" ]
+		then
+			hit=1
+			break;
+		fi
+	fi
+done
+if [ $hit -eq 0 ]
+then
+	echo "No NIC has an IP address."
+	exit 1
+fi
+ipaddr=${ipaddr%/*}
+nohup pxe_proxy -i $nic -c /etc/pxed.conf > /tmp/pxe_err.log 2>&1 &
+sed -i -e "s/192.168.98.9/$ipaddr/" /var/www/html/lenvdi/preseed-net.cfg
+sed -i -e "s/192.168.98.9/$ipaddr/" /var/svr/tftp/debian-installer/amd64/pxelinux.cfg/default
