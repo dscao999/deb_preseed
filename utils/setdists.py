@@ -8,6 +8,18 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 class MainWin(Gtk.Window):
+    def current_client(self):
+        with open("/var/www/html/lenvdi/preseed-net.cfg", "r") as fin:
+            for ln in fin:
+                if ln.find(" post-task-net.sh ") == -1:
+                    continue
+                fields = ln.split()
+                if fields[0] != 'sh' or fields[1] != 'post-task-net.sh':
+                    continue
+                client = fields[2]
+                break
+        return client
+
     def __init__(self):
         super().__init__(title="VDI Client Selection")
         self.set_border_width(10)
@@ -21,19 +33,26 @@ class MainWin(Gtk.Window):
         box.pack_start(hbox, True, True, 10)
         self.r_lidc = Gtk.RadioButton(label="LIDC Client")
         self.r_lidc.connect("toggled", self.on_toggled)
-        self.r_lidc.set_active(True)
         self.r_lidc.show()
         hbox.pack_start(self.r_lidc, True, True, 0)
         self.r_citx = Gtk.RadioButton(label="Citrix Client", group=self.r_lidc);
         self.r_citx.connect("toggled", self.on_toggled)
-        self.r_citx.set_active(False)
         self.r_citx.show()
         hbox.pack_start(self.r_citx, True, True, 0)
         self.r_vmwa = Gtk.RadioButton(label="VMWare Client", group=self.r_lidc);
         self.r_vmwa.connect("toggled", self.on_toggled)
         self.r_vmwa.show()
-        self.r_vmwa.set_active(False)
         hbox.pack_start(self.r_vmwa, True, True, 0)
+
+        client = self.current_client()
+        if client == 'lidcc':
+            self.r_lidc.set_active(True)
+        elif client == 'citrix':
+            self.r_citx.set_active(True)
+        elif client == 'vmware':
+            self.r_vmwa.set_active(True)
+        else:
+            print(f"No such client: {client}")
 
         hbox = Gtk.Box(spacing=5)
         hbox.show()
