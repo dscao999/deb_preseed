@@ -2,7 +2,7 @@
 #
 client=$1
 if [ "$client" != "citrix" -a "$client" != "vmware" -a \
-	"$client" != "lidcc" ]
+	"$client" != "lidcc" -a "$client" != "firefox" ]
 then
 	echo "Unknown client: $client"
 	exit 1
@@ -120,6 +120,8 @@ purge_libreoffice ()
 			;;
 		"citrix")
 			apt-get -y --allow-unauthenticated install ctxusb
+			;;
+		"firefox")
 			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
@@ -260,7 +262,12 @@ then
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/$usrdesk
 		cp $appdesk/lidc-client.desktop /home/lenovo/.config/$defdesk
 	fi
+elif [ -f $appdesk/seturl.desktop ]
+then
+	firstshot=.config/autostart/first-shot.desktop
+	eval su - $auto_user -c \'"cp $appdesk/seturl.desktop $firstshot"\'
 fi
+#
 rm -f $vminstf $icaclient $xfce_empty $xfce_def
 #
 plymouth-set-default-theme -R lenvdi

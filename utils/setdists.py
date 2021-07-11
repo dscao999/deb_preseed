@@ -43,6 +43,10 @@ class MainWin(Gtk.Window):
         self.r_vmwa.connect("toggled", self.on_toggled)
         self.r_vmwa.show()
         hbox.pack_start(self.r_vmwa, True, True, 0)
+        self.r_firefox = Gtk.RadioButton(label="Firefox ESR", group=self.r_lidc);
+        self.r_firefox.connect("toggled", self.on_toggled)
+        self.r_firefox.show()
+        hbox.pack_start(self.r_firefox, True, True, 0)
 
         client = self.current_client()
         if client == 'lidcc':
@@ -51,6 +55,8 @@ class MainWin(Gtk.Window):
             self.r_citx.set_active(True)
         elif client == 'vmware':
             self.r_vmwa.set_active(True)
+        elif client == 'firefox':
+            self.r_firefox.set_active(True)
         else:
             print(f"No such client: {client}")
 
@@ -81,6 +87,8 @@ class MainWin(Gtk.Window):
             sedcmd += "citrix/'"
         elif self.client == self.r_vmwa:
             sedcmd += "vmware/'"
+        elif self.client == self.r_firefox:
+            sedcmd += "firefox/'"
         else:
             print('Logic Error, No button active.')
             Gtk.main_quit()

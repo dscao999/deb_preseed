@@ -71,7 +71,10 @@ if not os.path.isdir(pool):
     sys.exit(3)
 
 for binary in os.listdir(dists):
-    os.chmod(dists + binary, stat.S_IRWXU)
+    bindir = dists + binary
+    ost = os.stat(bindir)
+    if ost.st_mode != (ost.st_mode|stat.S_IRWXU):
+        os.chmod(dists + binary, ost.st_mode|stat.S_IRWXU)
     pkgfile = dists + binary + '/Packages'
     if not os.path.isfile(pkgfile):
         continue
