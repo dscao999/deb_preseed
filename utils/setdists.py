@@ -80,7 +80,7 @@ class MainWin(Gtk.Window):
 
     def ok_clicked(self, button):
         sedcmd = "sed -i -e 's/\(sh post-task-net.sh \)"
-        sedcmd += "\(lidcc\|citrix\|vmware\)/\\1"
+        sedcmd += "\(lidcc\|citrix\|vmware\|firefox\)/\\1"
         if self.client == self.r_lidc:
             sedcmd += "lidcc/'"
         elif self.client == self.r_citx:

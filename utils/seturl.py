@@ -2,6 +2,7 @@
 #
 import gi
 import os, sys
+import subprocess as subp
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk
@@ -64,6 +65,25 @@ class MainWin(Gtk.Window):
             dialog.run()
             dialog.destroy()
             Gtk.main_quit()
+            sys.exit(1)
+
+        curl = 'curl -v ' + url + ' 2>&1|grep -E \'^< \' '
+        curlret = subp.run(curl, shell=True, text=True, stdout=subp.PIPE)
+        curlstatus = curlret.stdout.split('\n')
+        if curlret.returncode != 0 or (
+                curlstatus[0] != '< HTTP/1.1 200 OK' and
+                curlstatus[0] != '< HTTP/1.0 200 OK'):
+            dialog = Gtk.MessageDialog(
+                    parent=self,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="URL specified is not valid"
+                    )
+            dialog.run()
+            dialog.destroy()
+            return
+
         contents = []
         with open(desktop, 'r') as fin:
             for ln in fin:
@@ -81,8 +101,22 @@ class MainWin(Gtk.Window):
         with open(desktop, 'w') as fout:
             for ln in contents:
                 fout.write(ln)
-        os.remove(user_home+'/.config/autostart/first-shot.desktop')
-        Gtk.main_quit()
+        selfname = user_home + '/.config/autostart/first-shot.desktop'
+        if os.path.isfile(selfname):
+            os.remove(selfname)
+        logout = 'xfce4-session-logout --reboot'
+        logret = subp.run(logout, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+        if logret.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="Logout Failed. Please logout through the menu"
+                    )
+            dialog.run()
+            dialog.destroy()
+            Gtk.main_quit()
 
     def cancel_clicked(self, button):
         Gtk.main_quit()
