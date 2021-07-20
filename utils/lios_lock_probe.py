@@ -1,17 +1,26 @@
 #!/usr/bin/python3
 #
+import argparse
 import os, sys
 import subprocess as subp
+import argparse
 #
-# lios_probe hostname password
+# lios_probe --hostname hostname --password password
 #
-if len(sys.argv) < 3:
-    print(f'Missing options. Usage: {sys.argv[0]} hostname password')
-    sys.exit(1)
+parser = argparse.ArgumentParser()
+parser.add_argument('--hostname', help='new hostname')
+parser.add_argument('--password', help='new password')
+parser.add_argument('--username', default='lenovo', help='user name')
+args = parser.parse_args()
 
 lockfile = '/run/lock/lios_probe_lock'
-hostname = sys.argv[1]
-password = sys.argv[2]
+hostname = ''
+if args.hostname:
+    hostname = args.hostname
+password = ''
+if args.password:
+    password = args.password
+username = args.username
 
 try:
     fd = os.open(lockfile, os.O_WRONLY|os.O_CREAT|os.O_EXCL)
@@ -24,12 +33,17 @@ fobj.close()
 #
 # change user password
 #
-chpass = 'echo -n lenovo:' + password + '|chpasswd'
-chret = subp.run(chpass, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
-if chret.returncode != 0:
-    print(f'Cannot change password:\n{chret.stdout}')
+if len(password) > 0:
+    chpass = 'echo -n ' + username + ':' + password + '|chpasswd'
+    chret = subp.run(chpass, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+    if chret.returncode != 0:
+        print(f'Cannot change password:\n{chret.stdout}')
+        os.remove(lockfile)
+        sys.exit(5)
+#
+if len(hostname) == 0:
     os.remove(lockfile)
-    sys.exit(5)
+    sys.exit(0)
 #
 # change hostname
 #
@@ -53,9 +67,7 @@ if modret.returncode != 0:
     print(f'shell command failed: {modret.stdout}')
     reboot = True
 with open('/etc/hostname', 'w') as fout:
-    if hostname[-1] != '\n':
-        hostname = hostname + '\n'
-    fout.write(hostname)
+    fout.write(hostname+'\n')
 #
 with open('/etc/hosts', 'w') as fout:
     for ln in nln:
@@ -63,6 +75,7 @@ with open('/etc/hosts', 'w') as fout:
         if len(fields) > 1 and fields[1] == ohostname:
             continue
         fout.write(ln)
+
 # remove lock and return
 os.remove(lockfile)
 if reboot:
