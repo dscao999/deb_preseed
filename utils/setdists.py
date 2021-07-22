@@ -20,13 +20,48 @@ class MainWin(Gtk.Window):
                 break
         return client
 
+    def current_lidm(self):
+        retv = {"lidms": '', "lidmp": ''}
+        with open("/var/www/html/lenvdi/post-task-net.sh", "r") as fin:
+            for ln in fin:
+                if ln.find("lidm_s=") != 0 and ln.find("lidm_p=") != 0:
+                    continue
+                fields = ln.rstrip('\n').split('=')
+                if fields[0] == "lidm_s" and len(fields) > 1:
+                    retv["lidms"] = fields[1]
+                if fields[0] == "lidm_p" and len(fields) > 1:
+                    retv["lidmp"] = fields[1]
+        return retv
+
+
     def __init__(self):
-        super().__init__(title="VDI Client Selection")
+        super().__init__(title="VDI Client Installation Setup")
         self.set_border_width(10)
 
         box = Gtk.Box(spacing=6, orientation=Gtk.Orientation.VERTICAL)
         box.show()
         self.add(box)
+
+        lidm = self.current_lidm()
+        hbox = Gtk.Box(spacing=5)
+        hbox.show()
+        box.pack_start(hbox, True, True, 10)
+        label = Gtk.Label(label="LIDM IP: ")
+        label.show()
+        hbox.pack_start(label, False, False, 5)
+        self.lidms = Gtk.Entry()
+        self.lidms.set_width_chars(16)
+        self.lidms.set_text(lidm["lidms"])
+        self.lidms.show()
+        hbox.pack_start(self.lidms, True, True, 5)
+        label = Gtk.Label(label="Port: ")
+        label.show()
+        hbox.pack_start(label, False, False, 5)
+        self.port = Gtk.Entry()
+        self.port.set_width_chars(8)
+        self.port.set_text(lidm["lidmp"])
+        self.port.show()
+        hbox.pack_start(self.port, False, False, 5)
 
         hbox = Gtk.Box(spacing=5)
         hbox.show()
@@ -105,6 +140,42 @@ class MainWin(Gtk.Window):
             dialog.format_secondary_text(retv.stdout)
             dialog.run()
             dialog.destroy()
+            return
+
+        dstfile = " /var/www/html/lenvdi/post-task-net.sh"
+        lidm_s = self.lidms.get_text()
+        sedcmd = "sed -i -e 's/^\(lidm_s=\).*$/\\1" + lidm_s + "/'"
+        sedcmd += dstfile
+        retv = subproc.run(sedcmd, shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
+        if retv.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="Cannot set LIDM server ip/port"
+                    )
+            dialog.format_secondary_text(retv.stdout)
+            dialog.run()
+            dialog.destroy()
+            return
+        lidm_p = self.port.get_text()
+        sedcmd = "sed -i -e 's/^\(lidm_p=\).*$/\\1" + lidm_p + "/'"
+        sedcmd += dstfile
+        retv = subproc.run(sedcmd, shell=True, stdout=subproc.PIPE, stderr=subproc.STDOUT, text=True)
+        if retv.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="Cannot set LIDM server ip/port"
+                    )
+            dialog.format_secondary_text(retv.stdout)
+            dialog.run()
+            dialog.destroy()
+            return
+
         Gtk.main_quit()
 
     def cancel_clicked(self, button):
