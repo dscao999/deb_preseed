@@ -127,6 +127,10 @@ purge_libreoffice ()
 			echo "unknown vmhorizon value: $vmhorizon"
 			exit 1
 	esac
+	sedsubs=
+	[ -n "${lidm_s}" ] && sedsubs+="-e s/^#*LIDM=.*/LIDM=\"-s ${lidm_s}\"/ "
+	[ -n "${lidm_p}" ] && sedsubs+="-e s/^#*PORT=.*/PORT=\"-p ${lidm_p}\"/ "
+	[ -n "${sedsubs}" ] && eval sed -i ${sedsubs} /etc/default/plidm
 #
 	apt-get -y purge libreoffice-core libreoffice-common mythes-en-us uno-libs3 ure
 	apt-get -y autoremove
@@ -137,6 +141,8 @@ purge_libreoffice ()
 }
 #
 vmhorizon=lidcc
+lidm_s=
+lidm_p=
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #set -x
