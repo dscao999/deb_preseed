@@ -24,6 +24,7 @@ then
 	mount ${disk}3 /var/www/html/debian
 else
 	echo "No Debian Depot."
+	exit 1
 fi
 #
 #  wait for network online
@@ -34,18 +35,22 @@ do
 done
 #
 hit=0
-for nic in $(ls /sys/class/net)
+while [ $hit -eq 0 ]
 do
-	type=$(cat /sys/class/net/$nic/type)
-	if [ $type -eq 1 ]
-	then
-		ipaddr=$(ip addr show dev $nic|fgrep "inet "|awk '{print $2}')
-		if [ -n "$ipaddr" ]
+	for nic in $(ls /sys/class/net)
+	do
+		type=$(cat /sys/class/net/$nic/type)
+		if [ $type -eq 1 ]
 		then
-			hit=1
-			break;
+			ipaddr=$(ip addr show dev $nic|fgrep "inet "|awk '{print $2}')
+			if [ -n "$ipaddr" ]
+			then
+				hit=1
+				break;
+			fi
 		fi
-	fi
+	done
+	sleep 3
 done
 if [ $hit -eq 0 ]
 then
