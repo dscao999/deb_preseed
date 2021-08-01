@@ -118,39 +118,19 @@ mirror=
 splash=
 themes=
 myclient=lidcc
-TARGS=$(getopt -l mirror:,splash:,ntp:,nontp,pass:,client:,themes: \
-	-o m:s:r:t:np:c:a: -- "$@")
+TARGS=$(getopt -l splash:,pass:,client: \
+	-o s:p:c: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
-		--themes)
-			themes="$2"
-			if [ ! -f $themes -o ! -r $themes ]
-			then
-				echo "Themes package \"$themes\" cannot be read."
-				exit 2
-			fi
-			shift
-			;;
 		--client)
 			myclient="$2"
 			shift
 			;;
 		--pass)
 			pass="$2"
-			shift
-			;;
-		--nontp)
-			nontp=yes
-			;;
-		--ntp)
-			ntpsvr=$2
-			shift
-			;;
-		--mirror)
-			mirror=$2
 			shift
 			;;
 		--splash)
@@ -181,14 +161,11 @@ else
 	check_usbdisk $isofile
 	TOUSB=1
 fi
+#
 wdir=${PWD}
-[ "${mirror}" = "mirrors.ustc.edu.cn" ] && mirror=
-[ -n "${mirror}" ] && shttphost="s#mirrors\\.ustc\\.edu\\.cn\$#${mirror}#"
-[ -n "${ntpsvr}" ] && sntpsvr="s#cn\\.pool\\.ntp\\.org\$#${ntpsvr}#"
-[ "${nontp}" = "yes" ] && snontp="/^d-i  *clock-setup\\/ntp  *boolean  *true\$/s/true\$/false/"
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
-
-fln=244
+#
+fln=234
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -198,39 +175,52 @@ ISOLABEL=$LABEL
 pushd ${srcdir}
 find . -print | cpio -pd ${wdir}/${dstdir} > /dev/null
 popd
-if [ -n "$splash" -a -f "$splash" ]
-then
-	cp $splash ${dstdir}/isolinux/splash.png
-fi
-[ -n "${shttphost}" ] && sed -i -e "$shttphost" ${dstdir}/preseed-debian.cfg
-[ -n "${snontp}" ] && sed -i -e "$snontp" ${dstdir}/preseed-debian.cfg
-chmod u+w ${dstdir}/lenovo ${dstdir}/lenovo/post-task.sh
-if [ -n "${sntpsvr}" ]
-then
-	sed -i -e "$sntpsvr" ${dstdir}/preseed-debian.cfg
-	sed -i -e "s/^ntp_server=.*$/ntp_server=${ntpsvr}/" ${dstdir}/lenovo/post-task.sh
-fi
-if [ -n "${snontp}" ]
-then
-	sed -i -e "s/^ntp_server=.*$/ntp_server=/" ${dstdir}/lenovo/post-task.sh
-fi
-[ -n "${spassed}" ] && sed -i -e "$spassed" ${dstdir}/preseed-debian.cfg
+#
+PRESEED=${dstdir}/preseed-debian.cfg
+chmod u+w $PRESEED
+[ -n "${spassed}" ] && sed -i -e "$spassed" $PRESEED
 case "${myclient}" in
 	"vmware")
-		sed -i -e "s/^vmhorizon=.*$/vmhorizon=1/" ${dstdir}/lenovo/post-task.sh
 		;;
 	"citrix")
-		sed -i -e "s/[ \t]*vim$/\tctxusb/" ${dstdir}/preseed-debian.cfg
 		;;
 	"lidcc")
-		sed -i -e "s/[ \t]*vim$/\tlidc-client/" ${dstdir}/preseed-debian.cfg
+		;;
+	"firefox")
 		;;
 	*)
 		echo "Selected client is not valid: ${myclient}"
 		exit 1
 esac
-sed -i -e "s/post-task.sh lidcc\$/post-task.sh $myclient/" ${dstdir}/preseed-debian.cfg
-[ -n "$themes" ] && chmod u+w ${dstdir}/lenovo && cp $themes ${dstdir}/lenovo/themes.deb
+sed -i -e "s/post-task-net.sh [a-z][a-z]* /post-task-net.sh ${myclient} /" $PRESEED
+#
+#  adapt ip in preseed.cfg to current IP
+#
+hit=0
+while [ $hit -eq 0 ]
+do
+	for nic in $(ls /sys/class/net)
+	do
+		type=$(cat /sys/class/net/$nic/type)
+		if [ $type -eq 1 ]
+		then
+			ipaddr=$(ip addr show dev $nic|fgrep "inet "|awk '{print $2}')
+			if [ -n "$ipaddr" ]
+			then
+				hit=1
+				break;
+			fi
+		fi
+	done
+	sleep 3
+done
+if [ $hit -eq 0 ]
+then
+	echo "No NIC has an IP address."
+	exit 1
+fi
+ipaddr=${ipaddr%/*}
+sed -i -e "s#[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*#$ipaddr#" $PRESEED
 #
 if [ $TOUSB -eq 1 ]
 then
