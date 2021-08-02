@@ -141,7 +141,7 @@ purge_libreoffice ()
 }
 #
 vmhorizon=lidcc
-lidm_s=
+lidm_s=10.99.95.190
 lidm_p=
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
@@ -152,7 +152,7 @@ xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
 vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
 #
-purge_libreoffice &
+purge_libreoffice ${lidm_s} ${lidm_p} &
 #
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d

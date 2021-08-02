@@ -118,13 +118,17 @@ mirror=
 splash=
 themes=
 myclient=lidcc
-TARGS=$(getopt -l splash:,pass:,client: \
+TARGS=$(getopt -l splash:,pass:,mirror:,client: \
 	-o s:p:c: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
 while true
 do
 	case "$1" in
+		--mirror)
+			mirror="$2"
+			shift
+			;;
 		--client)
 			myclient="$2"
 			shift
@@ -165,7 +169,7 @@ fi
 wdir=${PWD}
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 #
-fln=234
+fln=251
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -193,6 +197,10 @@ case "${myclient}" in
 		exit 1
 esac
 sed -i -e "s/post-task-net.sh [a-z][a-z]* /post-task-net.sh ${myclient} /" $PRESEED
+cldeb=
+[ "$myclient" = "citrix" ] && cldeb=ctxusb
+[ "$myclient" = "lidcc" ] && cldeb=lidc-client
+[ -n "$cldeb" ] && sed -i -e "s/^\tvim$/\t${cldeb}/" $PRESEED
 #
 #  adapt ip in preseed.cfg to current IP
 #
@@ -221,6 +229,15 @@ then
 fi
 ipaddr=${ipaddr%/*}
 sed -i -e "s#[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*#$ipaddr#" $PRESEED
+if [ -n "$mirror" ]
+then
+	sed -i -e "s#\(string http://\)[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*#\1$mirror#" $PRESEED
+fi
+#
+netpool=/var/www/html/lenvdi
+cp -a $netpool/lenovo ${dstdir}
+chmod u+w ${dstdir}/dists && cp -a $netpool/dists/lenvdi ${dstdir}/dists/
+chmod u+w ${dstdir}/pool && cp -a $netpool/pool/lenvdi ${dstdir}/pool/
 #
 if [ $TOUSB -eq 1 ]
 then
