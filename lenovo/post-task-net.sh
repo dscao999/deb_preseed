@@ -14,6 +14,7 @@ then
 fi
 hostip=$2
 host=http://$2/lenvdi/lenovo
+cdrom=/cdrom/lenovo
 #
 TARGET=/target
 [ -f $TARGET/etc/profile ] && sed -e '$aset -o vi' -i $TARGET/etc/profile
@@ -30,21 +31,30 @@ then
 	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
 	sed -i -e 's/^GRUB_TIMEOUT=.*$/GRUB_TIMEOUT=0/' $TARGET/etc/default/grub
 fi
-firmfile=i915-firmware.tar.xz
-wget $host/$firmfile && unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
-#
-mkdir $TARGET/var/log/journal
-#
-xfce_def=default-desktop.tar.xz
-wget $host/$xfce_def && cp $xfce_def $TARGET/home/lenovo
-xfce_empty=empty-desktop.tar.xz
-wget $host/$xfce_empty && cp $xfce_empty $TARGET/home/lenovo
 # VMware view installation bundle
 vminst=VMware-Horizon-Client.x64.bundle
-wget $host/$vminst && cp $vminst $TARGET/home/lenovo && \
-	chmod +x $TARGET/home/lenovo/VMware-Horizon-Client.x64.bundle
+firmfile=i915-firmware.tar.xz
+xfce_def=default-desktop.tar.xz
+xfce_empty=empty-desktop.tar.xz
 icaclient=icaclient.tar.xz
-wget $host/$icaclient && cp $icaclient $TARGET/home/lenovo
+if [ -f $cdrom/$firmfile ]
+then
+	unxz -c $cdrom/$firmfile | ( cd $TARGET/libfirmware; tar -xf - )
+	cp $cdrom/$xfce_def $TARGET/home/lenovo
+	cp $cdrom/$xfce_empty $TARGET/home/lenovo
+	cp $cdrom/$icaclient $TARGET/home/lenovo
+	cp $cdrom/$vminst $TARGET/home/lenovo && \
+		chmod +x $TARGET/home/lenovo/$vminst
+else
+	wget $host/$firmfile && unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
+	wget $host/$xfce_def && cp $xfce_def $TARGET/home/lenovo
+	wget $host/$xfce_empty && cp $xfce_empty $TARGET/home/lenovo
+	wget $host/$icaclient && cp $icaclient $TARGET/home/lenovo
+	wget $host/$vminst && cp $vminst $TARGET/home/lenovo && \
+		chmod +x $TARGET/home/lenovo/$vminst
+fi
+#
+mkdir $TARGET/var/log/journal
 #
 # copy ttyS0 login service, to fix baud at 115200
 #
@@ -81,7 +91,7 @@ then
 	sync && fatlabel $efidev LIOS_ESP && sync
 fi
 #
-endline=93
+endline=103
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -113,15 +123,19 @@ purge_libreoffice ()
 	apt-get -y --allow-unauthenticated install lios-greeter-themes lenvdi-tools
 	case "$vmhorizon" in
 		"lidcc")
-			apt-get -y --allow-unauthenticated install lidc-client
+			apt-get -y --allow-unauthenticated install lidc-client || continue
 			;;
 		"vmware")
-			install_vmhorizon $vminstf
+			install_vmhorizon $vminstf || continue
 			;;
 		"citrix")
-			apt-get -y --allow-unauthenticated install ctxusb
+			apt-get -y --allow-unauthenticated install ctxusb || continue
 			;;
 		"firefox")
+			if dpkg --list lidc-client
+			then
+				dpkg --purge lidc-client
+			fi
 			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
