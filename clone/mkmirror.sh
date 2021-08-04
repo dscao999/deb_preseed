@@ -63,6 +63,8 @@ EOD
 sleep 1
 sudo sync
 #
+biosdat=first-1024K.dat
+#
 #  umount /mnt if interrupted
 #
 function cleanup()
@@ -71,7 +73,7 @@ function cleanup()
 	then
 		sudo umount /mnt
 	fi
-	[ -d legacy-bios ] && rm -r legacy-bios
+	[ -f $biosdat ] && rm $biosdat
 	[ -f mbr.dat ] && rm mbr.dat
 }
 #
@@ -100,21 +102,38 @@ echo
 #
 sudo mount ${device}3 /mnt
 sudo chown 1000:1000 /mnt
+cursize=$(df -k | fgrep /var/www/html/debian | awk '{print $3}')
+cursize=$((cursize+128))
+dstsize=$(df -k | fgrep /mnt | awk '{print $4}')
+if [ $cursize -gt 1048576 -a $dstsize -gt $cursize ]
+then
+	read -p "Would you like copy current debian packages?($((cursize/1048576))G) " ans
+	if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
+	then
+		echo -n "Copying $cursize K Bytes, Please be patient..."
+		( cd /var/www/html/debian && find . -print | cpio -pd /mnt )
+		echo "Complete"
+	fi
+
+fi
+#
+echo -n "Unmounting /mnt ..."
 sudo umount /mnt
+echo ""
 #
 # setup legacy bios boot code
 #
 function setup_legacy()
 {
 	sudo dd if=${device} of=mbr.dat bs=512 count=1
-	sudo dd if=legacy-bios/mbr-boot-code.dat of=mbr.dat bs=1 conv=notrunc
+	sudo dd if=$biosdat of=mbr.dat bs=1 count=446 conv=notrunc
 	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat oflag=direct
-	sudo dd if=legacy-bios/grub-boot-code.dat of=${device} bs=512 seek=1 oflag=direct conv=nocreat
+	sudo dd if=$biosdat of=${device} bs=512 skip=1 seek=1 oflag=direct conv=nocreat
 }
-lineno=121
-tail --lines=+${lineno} ${0} | cpio -id
+lineno=140
+tail --lines=+${lineno} ${0} > $biosdat
 touch mbr.dat
 setup_legacy
-rm -rf legacy-bios mbr.dat
+rm -f $biosdat mbr.dat
 #
 exit 0
