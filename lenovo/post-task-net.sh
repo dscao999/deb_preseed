@@ -39,7 +39,7 @@ xfce_empty=empty-desktop.tar.xz
 icaclient=icaclient.tar.xz
 if [ -f $cdrom/$firmfile ]
 then
-	unxz -c $cdrom/$firmfile | ( cd $TARGET/libfirmware; tar -xf - )
+	unxz -c $cdrom/$firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
 	cp $cdrom/$xfce_def $TARGET/home/lenovo
 	cp $cdrom/$xfce_empty $TARGET/home/lenovo
 	cp $cdrom/$icaclient $TARGET/home/lenovo
