@@ -117,6 +117,14 @@ install_vmhorizon ()
 	$bundle --console --required
 }
 #
+remove_lidcc ()
+{
+	if dpkg --list lidc-client
+	then
+		dpkg --purge lidc-client
+	fi
+}
+#
 purge_libreoffice ()
 {
 	apt-get update
@@ -126,16 +134,15 @@ purge_libreoffice ()
 			apt-get -y --allow-unauthenticated install lidc-client || continue
 			;;
 		"vmware")
+			remove_lidcc || continue
 			install_vmhorizon $vminstf || continue
 			;;
 		"citrix")
+			remove_lidcc || continue
 			apt-get -y --allow-unauthenticated install ctxusb || continue
 			;;
 		"firefox")
-			if dpkg --list lidc-client
-			then
-				dpkg --purge lidc-client
-			fi
+			remove_lidcc || continue
 			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
@@ -166,7 +173,7 @@ xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
 vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
 #
-purge_libreoffice ${lidm_s} ${lidm_p} &
+purge_libreoffice &
 #
 auto_user=liosuser
 mkdir /etc/lightdm/lightdm.conf.d
