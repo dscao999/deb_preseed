@@ -83,14 +83,14 @@ class MainWin(Gtk.Window):
         self.r_firefox.show()
         hbox.pack_start(self.r_firefox, True, True, 0)
 
-        client = self.current_client()
-        if client == 'lidcc':
+        self.client = self.current_client()
+        if self.client == 'lidcc':
             self.r_lidc.set_active(True)
-        elif client == 'citrix':
+        elif self.client == 'citrix':
             self.r_citx.set_active(True)
-        elif client == 'vmware':
+        elif self.client == 'vmware':
             self.r_vmwa.set_active(True)
-        elif client == 'firefox':
+        elif self.client == 'firefox':
             self.r_firefox.set_active(True)
         else:
             print(f"No such client: {client}")
@@ -107,7 +107,6 @@ class MainWin(Gtk.Window):
         cn_but.show()
         hbox.pack_start(cn_but, True, True, 0)
 
-        self.client = self.r_lidc
 
     def on_toggled(self, rbut):
         if rbut.get_active():

@@ -115,10 +115,11 @@ trap exit_trap INT EXIT
 pass=P@ssw0rd
 nontp=no
 mirror=
-splash=
+lidms=
+lidmp=
 themes=
 myclient=lidcc
-TARGS=$(getopt -l splash:,pass:,mirror:,client: \
+TARGS=$(getopt -l lidm-server:,lidm-port:,pass:,mirror:,client: \
 	-o s:p:c: -- "$@")
 [ $? -eq 0 ] || exit 1
 eval set -- $TARGS
@@ -137,8 +138,12 @@ do
 			pass="$2"
 			shift
 			;;
-		--splash)
-			splash=$2
+		--lidm-server)
+			lidms=$2
+			shift
+			;;
+		--lidm-port)
+			lidmp=$2
 			shift
 			;;
 		--)
@@ -169,7 +174,7 @@ fi
 wdir=${PWD}
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 #
-fln=251
+fln=263
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -201,6 +206,13 @@ cldeb=
 [ "$myclient" = "citrix" ] && cldeb=ctxusb
 [ "$myclient" = "lidcc" ] && cldeb=lidc-client
 [ -n "$cldeb" ] && sed -i -e "s/^\tvim$/\t${cldeb}/" $PRESEED
+#
+POSTTASK=${dstdir}/post-task-net.sh
+chmod u+w $POSTTASK
+edlidm=
+[ -n "$lidms" ] && edlidm="-e s/^lidm_s=.*$/lidm_s=$lidms/"
+[ -n "$lidmp" ] && edlidm+=" -e s/^lidm_p=.*$/lidm_p=$lidmp/"
+[ -n "$edlidm" ] && eval sed -i "$edlidm" $POSTTASK
 #
 #  adapt ip in preseed.cfg to current IP
 #

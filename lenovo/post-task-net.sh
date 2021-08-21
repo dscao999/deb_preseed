@@ -131,18 +131,24 @@ purge_libreoffice ()
 	apt-get -y --allow-unauthenticated install lios-greeter-themes lenvdi-tools
 	case "$vmhorizon" in
 		"lidcc")
-			apt-get -y --allow-unauthenticated install lidc-client || continue
+			if ! dpkg --list lidc-client
+			then
+				apt-get -y --allow-unauthenticated install lidc-client
+			fi
 			;;
 		"vmware")
-			remove_lidcc || continue
-			install_vmhorizon $vminstf || continue
+			remove_lidcc
+			install_vmhorizon $vminstf
 			;;
 		"citrix")
-			remove_lidcc || continue
-			apt-get -y --allow-unauthenticated install ctxusb || continue
+			remove_lidcc
+			if ! dpkg --list ctxusb
+			then
+				apt-get -y --allow-unauthenticated install ctxusb
+			fi
 			;;
 		"firefox")
-			remove_lidcc || continue
+			remove_lidcc
 			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
@@ -162,7 +168,7 @@ purge_libreoffice ()
 }
 #
 vmhorizon=lidcc
-lidm_s=10.99.95.190
+lidm_s=
 lidm_p=
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
