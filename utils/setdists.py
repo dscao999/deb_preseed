@@ -83,16 +83,21 @@ class MainWin(Gtk.Window):
         self.r_firefox.show()
         hbox.pack_start(self.r_firefox, True, True, 0)
 
-        self.client = self.current_client()
-        if self.client == 'lidcc':
+        client = self.current_client()
+        if client == 'lidcc':
             self.r_lidc.set_active(True)
-        elif self.client == 'citrix':
+            self.client_but = self.r_lidc
+        elif client == 'citrix':
             self.r_citx.set_active(True)
-        elif self.client == 'vmware':
+            self.client_but = self.r_citx
+        elif client == 'vmware':
             self.r_vmwa.set_active(True)
-        elif self.client == 'firefox':
+            self.client_but = self.r_vmwa
+        elif client == 'firefox':
             self.r_firefox.set_active(True)
+            self.client_but = self.r_firefox
         else:
+            self.client_but = None
             print(f"No such client: {client}")
 
         hbox = Gtk.Box(spacing=5)
@@ -110,18 +115,18 @@ class MainWin(Gtk.Window):
 
     def on_toggled(self, rbut):
         if rbut.get_active():
-            self.client = rbut
+            self.client_but = rbut
 
     def ok_clicked(self, button):
         sedcmd = "sed -i -e 's/\(sh post-task-net.sh \)"
         sedcmd += "\(lidcc\|citrix\|vmware\|firefox\)/\\1"
-        if self.client == self.r_lidc:
+        if self.client_but == self.r_lidc:
             sedcmd += "lidcc/'"
-        elif self.client == self.r_citx:
+        elif self.client_but == self.r_citx:
             sedcmd += "citrix/'"
-        elif self.client == self.r_vmwa:
+        elif self.client_but == self.r_vmwa:
             sedcmd += "vmware/'"
-        elif self.client == self.r_firefox:
+        elif self.client_but == self.r_firefox:
             sedcmd += "firefox/'"
         else:
             print('Logic Error, No button active.')
