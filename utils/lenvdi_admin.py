@@ -27,6 +27,11 @@ def vdi_admin(action, **kargs):
         cmd += ' --sip=' + kargs["sip"]
     elif action == 'time_sync':
         cmd += ' --ntp="' + kargs["ntp"] + '"'
+    elif action == 'set-hostname':
+        cmd += ' --hostname=' + kargs["hostname"]
+    else:
+        print("Not a valid action")
+        return
 
     cmd += ' ' + action
     res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
@@ -270,6 +275,63 @@ class TimerBox(Gtk.Box):
             dialog.run()
             dialog.destroy()
 
+def get_hostname():
+    cmd = 'hostnamectl --static'
+    res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
+            shell=True, text=True)
+    return res.stdout.rstrip('\n')
+
+class HostBox(Gtk.Box):
+    def set_hostname(self, but):
+        newname = self.hostname.get_text()
+        if newname == self.cur_hostname:
+            dialog = EchoInfo(self.rootwin, "No Change in Hostname, Ignored")
+            dialog.run()
+            dialog.destroy()
+            return
+        res = vdi_admin('set-hostname', hostname=newname);
+        if res[0] != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self.rootwin,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text="Fail to Change host name"
+                    )
+            dialog.format_secondary_text(res[1])
+            dialog.run()
+            dialog.destroy()
+        else:
+            dialog = EchoInfo(self.rootwin, "hostname changed to: "+newname)
+            dialog.run()
+            dialog.destroy()
+
+    def __init__(self, rootwin):
+        super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
+        self.set_homogeneous(False)
+        self.rootwin = rootwin
+
+        box = Gtk.Box(spacing=6)
+        box.show()
+        self.pack_start(box, True, True, 0)
+
+        label = Gtk.Label(label="Host Name: ")
+        label.show()
+        box.pack_start(label, True, True, 0)
+        self.cur_hostname = get_hostname()
+        self.hostname = Gtk.Entry(text=self.cur_hostname)
+        self.hostname.set_width_chars(24)
+        self.hostname.show()
+        box.pack_start(self.hostname, True, True, 0)
+
+        box = Gtk.Box(spacing=6)
+        box.show()
+        self.pack_start(box, True, True, 0)
+        but = Gtk.Button(label="Set")
+        but.connect("clicked", self.set_hostname)
+        but.show()
+        box.pack_start(but, True, True, 0)
+
 class VDIBox(Gtk.Box):
     def __init__(self, rootwin):
         super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
@@ -393,6 +455,10 @@ class MainWin(Gtk.Window):
         tmbox = TimerBox(self);
         tmbox.show()
         stack.add_titled(tmbox, "timerset", "Timer Sync")
+
+        hostbox = HostBox(self);
+        hostbox.show()
+        stack.add_titled(hostbox, "sethost", "Set Hostname")
 
         stack_switcher = Gtk.StackSwitcher()
         stack_switcher.set_stack(stack)

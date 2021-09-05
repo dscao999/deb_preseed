@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-TARGS=$(getopt -l client:,rootca:,sname:,sip:,ntp: -o c:a:s:i:t -- "$@")
+TARGS=$(getopt -l client:,rootca:,sname:,sip:,ntp:,hostname: -o c:a:s:i:t -- "$@")
 [ $? -ne 0 ] && exit 1
 eval set -- $TARGS
+HOSTNAME=
 CLIENT=
 SNAME=
 SIP=
@@ -12,6 +13,10 @@ ROOTCA=
 HEND=0
 while [ $HEND -eq 0 ]; do
 	case "$1" in
+	--hostname)
+		HOSTNAME=$2
+		shift
+		;;
 	--client)
 		CLIENT=$2
 		shift
@@ -111,6 +116,32 @@ case "$ACTION" in
 		fi
 		eval sed -i -e "'/^[0-9].*[\\t ]${SNAME}/s/^./#&/'" \
 			-e "'\$a#\n${SIP}\\t${SNAME}'" /etc/hosts
+		;;
+	set-hostname)
+		ohostname=$(hostnamectl --static)
+		if [ "$ohostname" != "$HOSTNAME" ]
+		then
+			sed -i -e "/${ohostname}/a127.0.1.1\t${HOSTNAME}" /etc/hosts
+			hostnamectl --static set-hostname $HOSTNAME
+			savelocal=rc.local-$$
+			if [ -f /etc/rc.local ]
+			then
+				cp /etc/rc.local /etc/$savelocal
+				cat >> /etc/rc.local <<-EOD
+					sed -i -e "/${ohostname}\$/d" /etc/hosts
+					rm /etc/rc.local
+					[ -r /etc/$savelocal ] && mv /etc/$savelocal /etc/rc.local
+				EOD
+			else
+				cat > /etc/rc.local <<-EOD
+					#!/bin/bash
+					sed -i -e "/${ohostname}\$/d" /etc/hosts
+					rm /etc/rc.local
+					[ -r /etc/$savelocal ] && mv /etc/$savelocal /etc/rc.local
+				EOD
+			fi
+			chmod ugo+x /etc/rc.local
+		fi
 		;;
 	*)
 		echo "Unknown operation: $ACTION"
