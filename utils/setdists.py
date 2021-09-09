@@ -70,6 +70,10 @@ class MainWin(Gtk.Window):
         self.r_lidc.connect("toggled", self.on_toggled)
         self.r_lidc.show()
         hbox.pack_start(self.r_lidc, True, True, 0)
+        self.r_educ = Gtk.RadioButton(label="LIDC Edu", group=self.r_lidc);
+        self.r_educ.connect("toggled", self.on_toggled)
+        self.r_educ.show()
+        hbox.pack_start(self.r_educ, True, True, 0)
         self.r_citx = Gtk.RadioButton(label="Citrix Client", group=self.r_lidc);
         self.r_citx.connect("toggled", self.on_toggled)
         self.r_citx.show()
@@ -87,6 +91,9 @@ class MainWin(Gtk.Window):
         if client == 'lidcc':
             self.r_lidc.set_active(True)
             self.client_but = self.r_lidc
+        elif client == 'educ':
+            self.r_educ.set_active(True)
+            self.client_but = self.r_educ
         elif client == 'citrix':
             self.r_citx.set_active(True)
             self.client_but = self.r_citx
@@ -119,7 +126,7 @@ class MainWin(Gtk.Window):
 
     def ok_clicked(self, button):
         sedcmd = "sed -i -e 's/\(sh post-task-net.sh \)"
-        sedcmd += "\(lidcc\|citrix\|vmware\|firefox\)/\\1"
+        sedcmd += "\(lidcc\|citrix\|vmware\|educ\|firefox\)/\\1"
         if self.client_but == self.r_lidc:
             sedcmd += "lidcc/'"
         elif self.client_but == self.r_citx:
@@ -128,6 +135,8 @@ class MainWin(Gtk.Window):
             sedcmd += "vmware/'"
         elif self.client_but == self.r_firefox:
             sedcmd += "firefox/'"
+        elif self.client_but == self.r_educ:
+            sedcmd += "educ/'"
         else:
             print('Logic Error, No button active.')
             Gtk.main_quit()

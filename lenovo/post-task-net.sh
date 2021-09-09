@@ -2,7 +2,8 @@
 #
 client=$1
 if [ "$client" != "citrix" -a "$client" != "vmware" -a \
-	"$client" != "lidcc" -a "$client" != "firefox" ]
+	"$client" != "lidcc" -a "$client" != "firefox" \
+	-a "$client" != "educ" ]
 then
 	echo "Unknown client: $client"
 	exit 1
@@ -37,6 +38,7 @@ firmfile=i915-firmware.tar.xz
 xfce_def=default-desktop.tar.xz
 xfce_empty=empty-desktop.tar.xz
 icaclient=icaclient.tar.xz
+bigagent=lidmagent.tar.gz
 if [ -f $cdrom/$firmfile ]
 then
 	unxz -c $cdrom/$firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
@@ -45,6 +47,7 @@ then
 	cp $cdrom/$icaclient $TARGET/home/lenovo
 	cp $cdrom/$vminst $TARGET/home/lenovo && \
 		chmod +x $TARGET/home/lenovo/$vminst
+	cp $cdrom/$bigagent $TARGET/home/lenovo
 else
 	wget $host/$firmfile && unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
 	wget $host/$xfce_def && cp $xfce_def $TARGET/home/lenovo
@@ -52,6 +55,7 @@ else
 	wget $host/$icaclient && cp $icaclient $TARGET/home/lenovo
 	wget $host/$vminst && cp $vminst $TARGET/home/lenovo && \
 		chmod +x $TARGET/home/lenovo/$vminst
+	wget $host/$bigagent && cp $bigagent $TARGET/home/lenovo
 fi
 #
 mkdir $TARGET/var/log/journal
@@ -91,7 +95,7 @@ then
 	sync && fatlabel $efidev LIOS_ESP && sync
 fi
 #
-endline=103
+endline=107
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -150,6 +154,18 @@ purge_libreoffice ()
 		"firefox")
 			remove_lidcc
 			;;
+		"educ")
+			remove_lidcc
+			apt-get -y --allow-unauthenticated install lidc-client-edu jpeg-player
+			apt-get -y --allow-unauthenticated install virt-viewer
+			pushd /home/lenovo
+			tar -zxf $bigagent && ./lidmagent-setup.sh
+			if [ $? -eq 0 ]
+			then
+				rm -f lidmagent*.deb lidmwatchdog*.deb lidmagent-setup.sh
+			fi
+			popd
+			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
 			exit 1
@@ -168,8 +184,8 @@ purge_libreoffice ()
 }
 #
 vmhorizon=lidcc
-lidm_s=
-lidm_p=
+lidm_s=192.168.98.104
+lidm_p=7801
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #set -x
@@ -178,6 +194,7 @@ xfce_def=/home/lenovo/default-desktop.tar.xz
 xfce_empty=/home/lenovo/empty-desktop.tar.xz
 icaclient=/home/lenovo/icaclient.tar.xz
 vminstf=/home/lenovo/VMware-Horizon-Client.x64.bundle
+bigagent=/home/lenovo/lidmagent.tar.gz
 #
 purge_libreoffice &
 #
@@ -301,7 +318,7 @@ then
 	eval su - $auto_user -c \'"cp $appdesk/seturl.desktop $firstshot"\'
 fi
 #
-rm -f $vminstf $icaclient $xfce_empty $xfce_def
+rm -f $vminstf $icaclient $xfce_empty $xfce_def $bigagent
 #
 plymouth-set-default-theme -R lenvdi
 update-grub2
