@@ -174,7 +174,7 @@ fi
 wdir=${PWD}
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 #
-fln=263
+fln=276
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -195,6 +195,8 @@ case "${myclient}" in
 		;;
 	"lidcc")
 		;;
+	"lidcc-edu")
+		;;
 	"firefox")
 		;;
 	*)
@@ -204,15 +206,17 @@ esac
 sed -i -e "s/post-task-net.sh [a-z][a-z]* /post-task-net.sh ${myclient} /" $PRESEED
 cldeb=
 [ "$myclient" = "citrix" ] && cldeb=ctxusb
-[ "$myclient" = "lidcc" ] && cldeb=lidc-client
+[ "$myclient" = "lidcc" ] && cldeb="lidc-client virt-viewer"
+[ "$myclient" = "lidcc-edu" ] && cldeb="lidc-client-edu jpeg-player virt-viewer"
 [ -n "$cldeb" ] && sed -i -e "s/^\tvim$/\t${cldeb}/" $PRESEED
 #
-POSTTASK=${dstdir}/post-task-net.sh
-chmod u+w $POSTTASK
+netpool=/var/www/html/lenvdi
+POSTTASK=post-task-net.sh
+cp $netpool/${POSTTASK} ${dstdir}/${POSTTASK}
 edlidm=
 [ -n "$lidms" ] && edlidm="-e s/^lidm_s=.*$/lidm_s=$lidms/"
 [ -n "$lidmp" ] && edlidm+=" -e s/^lidm_p=.*$/lidm_p=$lidmp/"
-[ -n "$edlidm" ] && eval sed -i "$edlidm" $POSTTASK
+[ -n "$edlidm" ] && eval sed -i "$edlidm" ${dstdir}/$POSTTASK
 #
 #  adapt ip in preseed.cfg to current IP
 #
@@ -246,10 +250,19 @@ then
 	sed -i -e "s#\(string http://\)[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*#\1$mirror#" $PRESEED
 fi
 #
-netpool=/var/www/html/lenvdi
 cp -a $netpool/lenovo ${dstdir}
 chmod u+w ${dstdir}/dists && cp -a $netpool/dists/lenvdi ${dstdir}/dists/
 chmod u+w ${dstdir}/pool && cp -a $netpool/pool/lenvdi ${dstdir}/pool/
+if [ "$myclient" != "lidcc" ]
+then
+	rm ${dstdir}/pool/lenvdi/lidc-client_*.deb
+fi
+if [ "$myclient" != "lidcc-edu" ]
+then
+	rm ${dstdir}/pool/lenvdi/lidc-client-edu*.deb
+	rm ${dstdir}/pool/lenvdi/jpeg-player*.deb
+fi
+pisopkg.py ${dstdir}
 #
 if [ $TOUSB -eq 1 ]
 then

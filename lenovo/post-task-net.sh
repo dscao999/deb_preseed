@@ -3,7 +3,7 @@
 client=$1
 if [ "$client" != "citrix" -a "$client" != "vmware" -a \
 	"$client" != "lidcc" -a "$client" != "firefox" \
-	-a "$client" != "educ" ]
+	-a "$client" != "lidcc-edu" ]
 then
 	echo "Unknown client: $client"
 	exit 1
@@ -127,6 +127,18 @@ remove_lidcc ()
 	then
 		dpkg --purge lidc-client
 	fi
+	if dpkg --list lidc-client-edu
+	then
+		dpkg --purge lidc-client-edu
+	fi
+	if dpkg --list jpeg-player
+	then
+		dpkg --purge jpeg-player
+	fi
+	if dpkg --list virt-viewer
+	then
+		dpkg --purge virt-viewer
+	fi
 }
 #
 purge_libreoffice ()
@@ -138,6 +150,10 @@ purge_libreoffice ()
 			if ! dpkg --list lidc-client
 			then
 				apt-get -y --allow-unauthenticated install lidc-client
+			fi
+			if ! dpkg --list virt-viewer
+			then
+				apt-get -y install virt-viewer
 			fi
 			;;
 		"vmware")
@@ -154,10 +170,15 @@ purge_libreoffice ()
 		"firefox")
 			remove_lidcc
 			;;
-		"educ")
-			remove_lidcc
-			apt-get -y --allow-unauthenticated install lidc-client-edu jpeg-player
-			apt-get -y --allow-unauthenticated install virt-viewer
+		"lidcc-edu")
+			if ! dpkg --list lidc-client-edu
+			then
+				apt-get -y --allow-unauthenticated install lidc-client-edu jpeg-player
+			fi
+			if ! dpkg --list virt-viewer
+			then
+				apt-get -y install virt-viewer
+			fi
 			pushd /home/lenovo
 			tar -zxf $bigagent && ./lidmagent-setup.sh
 			if [ $? -eq 0 ]
@@ -304,7 +325,7 @@ then
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/$usrdesk
 	cp $appdesk/vmware-view.desktop /home/lenovo/.config/$defdesk
 #
-elif dpkg --list lidc-client
+elif dpkg --list lidc-client || dpkg --list lidc-client-edu
 then
 	if [ -r $appdesk/lidc-client.desktop ]
 	then
