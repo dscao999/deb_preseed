@@ -174,7 +174,7 @@ fi
 wdir=${PWD}
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 #
-fln=276
+fln=282
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -253,14 +253,20 @@ fi
 cp -a $netpool/lenovo ${dstdir}
 chmod u+w ${dstdir}/dists && cp -a $netpool/dists/lenvdi ${dstdir}/dists/
 chmod u+w ${dstdir}/pool && cp -a $netpool/pool/lenvdi ${dstdir}/pool/
-if [ "$myclient" != "lidcc" ]
-then
+if [ "$myclient" != "lidcc" ]; then
 	rm ${dstdir}/pool/lenvdi/lidc-client_*.deb
 fi
-if [ "$myclient" != "lidcc-edu" ]
-then
+if [ "$myclient" != "lidcc-edu" ]; then
 	rm ${dstdir}/pool/lenvdi/lidc-client-edu*.deb
 	rm ${dstdir}/pool/lenvdi/jpeg-player*.deb
+	rm ${dstdir}/lenovo/lidmagent*
+fi
+if [ "$myclient" != "vmware" ]; then
+	rm ${dstdir}/lenovo/VMware-Horizon-Client*
+fi
+if [ "$myclient" != "citrix" ]; then
+	rm ${dstdir}/pool/lenvdi/ctxusb_*.deb
+	rm ${dstdir}/pool/lenvdi/icaclient_*.deb
 fi
 pisopkg.py ${dstdir}
 #

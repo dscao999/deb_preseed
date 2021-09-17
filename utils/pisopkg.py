@@ -4,6 +4,7 @@ import os, sys, stat
 import hashlib
 import shutil
 import subprocess as subp
+from pathlib import Path
 
 def manideb(debfile, arch):
     pkgdsc = []
@@ -76,10 +77,10 @@ for binary in os.listdir(dists):
     if ost.st_mode != (ost.st_mode|stat.S_IRWXU):
         os.chmod(dists + binary, ost.st_mode|stat.S_IRWXU)
     pkgfile = dists + binary + '/Packages'
-    if not os.path.isfile(pkgfile):
-        continue
-    print(f'os.remove({pkgfile})')
-    os.remove(pkgfile)
+    if os.path.isfile(pkgfile):
+        print(f'os.remove({pkgfile})')
+        os.remove(pkgfile)
+    Path(pkgfile).touch()
 
 deb_entries = os.listdir(pool)
 for deb_entry in deb_entries:

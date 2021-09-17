@@ -45,17 +45,25 @@ then
 	cp $cdrom/$xfce_def $TARGET/home/lenovo
 	cp $cdrom/$xfce_empty $TARGET/home/lenovo
 	cp $cdrom/$icaclient $TARGET/home/lenovo
-	cp $cdrom/$vminst $TARGET/home/lenovo && \
-		chmod +x $TARGET/home/lenovo/$vminst
-	cp $cdrom/$bigagent $TARGET/home/lenovo
+	if [ "$client" = "vmware" ]; then
+		cp $cdrom/$vminst $TARGET/home/lenovo && \
+			chmod +x $TARGET/home/lenovo/$vminst
+	fi
+	if [ "$client" = "lidcc-edu" ]; then
+		cp $cdrom/$bigagent $TARGET/home/lenovo
+	fi
 else
 	wget $host/$firmfile && unxz -c $firmfile | ( cd $TARGET/lib/firmware; tar -xf - )
 	wget $host/$xfce_def && cp $xfce_def $TARGET/home/lenovo
 	wget $host/$xfce_empty && cp $xfce_empty $TARGET/home/lenovo
 	wget $host/$icaclient && cp $icaclient $TARGET/home/lenovo
-	wget $host/$vminst && cp $vminst $TARGET/home/lenovo && \
-		chmod +x $TARGET/home/lenovo/$vminst
-	wget $host/$bigagent && cp $bigagent $TARGET/home/lenovo
+	if [ "$client" = "vmware" ]; then
+		wget $host/$vminst && cp $vminst $TARGET/home/lenovo && \
+			chmod +x $TARGET/home/lenovo/$vminst
+	fi
+	if [ "$client" = "lidcc-edu" ]; then
+		wget $host/$bigagent && cp $bigagent $TARGET/home/lenovo
+	fi
 fi
 #
 mkdir $TARGET/var/log/journal
@@ -95,7 +103,7 @@ then
 	sync && fatlabel $efidev LIOS_ESP && sync
 fi
 #
-endline=107
+endline=115
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
@@ -123,20 +131,16 @@ install_vmhorizon ()
 #
 remove_lidcc ()
 {
-	if dpkg --list lidc-client
-	then
-		dpkg --purge lidc-client
-	fi
-	if dpkg --list lidc-client-edu
-	then
+	if dpkg --list lidc-client-edu; then
 		dpkg --purge lidc-client-edu
 	fi
-	if dpkg --list jpeg-player
-	then
+	if dpkg --list lidc-client; then
+		dpkg --purge lidc-client
+	fi
+	if dpkg --list jpeg-player; then
 		dpkg --purge jpeg-player
 	fi
-	if dpkg --list virt-viewer
-	then
+	if dpkg --list virt-viewer; then
 		dpkg --purge virt-viewer
 	fi
 }
@@ -179,13 +183,12 @@ purge_libreoffice ()
 			then
 				apt-get -y install virt-viewer
 			fi
-			pushd /home/lenovo
+			mkdir /home/lenovo/lidmagent
+			pushd /home/lenovo/lidmagent
 			tar -zxf $bigagent && ./lidmagent-setup.sh
-			if [ $? -eq 0 ]
-			then
-				rm -f lidmagent*.deb lidmwatchdog*.deb lidmagent-setup.sh
-			fi
+			inst_status=$?
 			popd
+			[ $inst_status -eq 0 ] && rm -rf /home/lenovo/lidmagent
 			;;
 		*)
 			echo "unknown vmhorizon value: $vmhorizon"
@@ -249,6 +252,7 @@ done
 #
 cat > /home/$auto_user/.i18n <<"ENDDOC"
 LANG=zh_CN.utf8
+ulimit -c 819200
 ENDDOC
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
@@ -307,11 +311,9 @@ fi
 sed -i -e '/boot[ \t]/s/defaults/ro,&/' -e '/boot\/efi/s/umask=0077/ro,&/' /etc/fstab
 #
 wait
-if dpkg --list icaclient
-then
+if dpkg --list icaclient; then
 	autoapp=$appdesk/selfservice.desktop
-	if systemctl --all list-units | fgrep ctxlogd > /dev/null 2>&1
-	then
+	if systemctl --all list-units | fgrep ctxlogd > /dev/null 2>&1; then
 		systemctl enable ctxlogd
 	fi
 	icaroot=/opt/Citrix/ICAClient
@@ -319,22 +321,24 @@ then
 	sed -i -e '/^\[WFClient/aDesktopApplianceMode=TRUE' ${icaroot}/config/module.ini
 	[ -r $autoapp ] && cp $autoapp /home/$auto_user/.config/autostart/
 #
-elif [ -r $appdesk/vmware-view.desktop ]
-then
+elif [ -r $appdesk/vmware-view.desktop ]; then
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/autostart/
 	cp $appdesk/vmware-view.desktop /home/$auto_user/.config/$usrdesk
 	cp $appdesk/vmware-view.desktop /home/lenovo/.config/$defdesk
 #
-elif dpkg --list lidc-client || dpkg --list lidc-client-edu
-then
-	if [ -r $appdesk/lidc-client.desktop ]
-	then
+elif dpkg --list lidc-client-edu; then
+	if [ -r $appdesk/lidc-client-edu.desktop ]; then
+		cp $appdesk/lidc-client-edu.desktop /home/$auto_user/.config/autostart/
+		cp $appdesk/lidc-client-edu.desktop /home/$auto_user/.config/$usrdesk
+		cp $appdesk/lidc-client-edu.desktop /home/lenovo/.config/$defdesk
+	fi
+elif dpkg --list lidc-client; then
+	if [ -r $appdesk/lidc-client.desktop ]; then
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/autostart/
 		cp $appdesk/lidc-client.desktop /home/$auto_user/.config/$usrdesk
 		cp $appdesk/lidc-client.desktop /home/lenovo/.config/$defdesk
 	fi
-elif [ -f $appdesk/seturl.desktop ]
-then
+elif [ -f $appdesk/seturl.desktop ]; then
 	firstshot=.config/autostart/first-shot.desktop
 	eval su - $auto_user -c \'"cp $appdesk/seturl.desktop $firstshot"\'
 fi

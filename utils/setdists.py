@@ -91,7 +91,7 @@ class MainWin(Gtk.Window):
         if client == 'lidcc':
             self.r_lidc.set_active(True)
             self.client_but = self.r_lidc
-        elif client == 'educ':
+        elif client == 'lidcc-edu':
             self.r_educ.set_active(True)
             self.client_but = self.r_educ
         elif client == 'citrix':
@@ -126,7 +126,7 @@ class MainWin(Gtk.Window):
 
     def ok_clicked(self, button):
         sedcmd = "sed -i -e 's/\(sh post-task-net.sh \)"
-        sedcmd += "\(lidcc\|citrix\|vmware\|educ\|firefox\)/\\1"
+        sedcmd += "\(lidcc\|citrix\|vmware\|lidcc-edu\|firefox\)/\\1"
         if self.client_but == self.r_lidc:
             sedcmd += "lidcc/'"
         elif self.client_but == self.r_citx:
@@ -136,7 +136,7 @@ class MainWin(Gtk.Window):
         elif self.client_but == self.r_firefox:
             sedcmd += "firefox/'"
         elif self.client_but == self.r_educ:
-            sedcmd += "educ/'"
+            sedcmd += "lidcc-edu/'"
         else:
             print('Logic Error, No button active.')
             Gtk.main_quit()
