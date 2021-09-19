@@ -12,6 +12,7 @@ os.environ['SUDO_ASKPASS'] = '/usr/lib/ssh/x11-ssh-askpass'
 citrix_file = '/usr/share/applications/selfservice.desktop'
 vmware_file = '/usr/share/applications/vmware-view.desktop'
 lidcc_file = '/usr/share/applications/lidc-client.desktop'
+lidcc_edu_file = '/usr/share/applications/lidc-client-edu.desktop'
 
 timeconf = '/etc/systemd/timesyncd.conf'
 
@@ -47,6 +48,16 @@ class EchoInfo(Gtk.MessageDialog):
                 text=info
                 )
 
+def ping_ip(ip, rootwin):
+    cmd = 'nslookup ' + ip
+    retv = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
+            shell=True, text=True)
+    if retv.returncode != 0:
+        echo = EchoInfo(rootwin, ip + ' check failed')
+        echo.run()
+        echo.destroy()
+
+    return retv.returncode
 
 class CABox(Gtk.Box):
     def __init__(self, rootwin):
@@ -64,7 +75,7 @@ class CABox(Gtk.Box):
             self.client = 'citrix'
         elif os.path.isfile(vmware_file):
             self.client = 'vmware'
-        elif os.path.isfile(lidcc_file):
+        elif os.path.isfile(lidcc_file) or os.path.isfile(lidcc_edu_file):
             self.client = 'lidcc'
         else:
             self.client = 'unknown'
@@ -234,6 +245,9 @@ class TimerBox(Gtk.Box):
         if row:
             return
 
+        retv = ping_ip(ip, self.rootwin)
+        if retv != 0:
+            return
         row = Gtk.ListBoxRow()
         label = Gtk.Label(label=ip)
         label.show()
@@ -379,16 +393,20 @@ class VDIBox(Gtk.Box):
         if but.get_active():
             self.use_dns = True
             self.ip_entry.set_editable(False)
-            self.name_entry.set_editable(False)
         else:
             self.use_dns = False
             self.ip_entry.set_editable(True)
-            self.name_entry.set_editable(True)
 
     def save_service_ip(self, but):
-        if self.use_dns:
-            return
         svrname = self.name_entry.get_text()
+        if self.use_dns:
+            retv = ping_ip(svrname, self.rootwin)
+            if retv != 0:
+                echo = EchoInfo(rootwin, ip + ' check failed')
+                echo.run()
+                echo.destroy()
+            return
+
         ip = self.ip_entry.get_text()
         if not svrname or not ip:
             return
