@@ -90,7 +90,7 @@ function lios_clone()
 		[ $tsize -gt 1232896 ] && \
 		echo "Copying files in $dpart, $tsize KBytes, Please wait for a while..."
 		pushd $srcdir
-		sudo find . -print | sudo cpio -o | \
+		sudo find . -print | sudo cpio --block-size=256 -o | \
 			dd of=$target_dir/sys_disk_${LABEL}.cpio obs=128K
 		popd
 		sudo umount $dpart
@@ -338,7 +338,7 @@ function restore_to()
 		sudo mount -t $TYPE $device /mnt
 		pushd /mnt
 		echo "Restoring contents from $srcpath/sys_disk_${LABEL}.cpio ..."
-		sudo cpio -id < $srcpath/sys_disk_${LABEL}.cpio
+		sudo cpio --block-size=256 -id < $srcpath/sys_disk_${LABEL}.cpio
 		[ "$LABEL" = "LIOS_ESP" -a -f EFI/debian/shimx64.efi ] && \
 			UEFIBOOT=1
 		popd

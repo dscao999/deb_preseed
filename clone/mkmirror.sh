@@ -86,14 +86,14 @@ sudo mkfs -t xfs -f -L DEBIAN_DEPOT ${device}3
 #
 sudo mount ${device}1 /mnt
 pushd ${cdmedium}
-find ./EFI -print | sudo cpio -pd /mnt
+find ./EFI -print | sudo cpio --block-size=256 -pd /mnt
 popd
 sudo umount /mnt
 #
 sudo mount ${device}2 /mnt
 pushd ${cdmedium}
 echo -n "Copying Live OS ..."
-find . -print | sudo cpio -pd /mnt
+find . -print | sudo cpio --block-size=256 -pd /mnt
 echo
 popd
 echo -n "Umounting U Disk, will take several minutes..."
@@ -111,7 +111,7 @@ then
 	if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
 	then
 		echo -n "Copying $cursize K Bytes, Please be patient..."
-		( cd /var/www/html/debian && find . -print | cpio -pd /mnt )
+		( cd /var/www/html/debian && find . -print | cpio --block-size=256 -pd /mnt )
 		echo "Complete"
 	fi
 
