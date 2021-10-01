@@ -35,7 +35,7 @@ function abnormal()
 	cleanup
 	exit 10
 }
-trap abnormal INT
+trap fin=1 INT
 #
 # clone LIOS
 #
@@ -84,16 +84,34 @@ function lios_clone()
 #
 		[ "$TYPE" = "swap" ] && continue
 		[ "$TYPE" = "ext2" ] && continue
-		sudo mount -t $TYPE -o ro $dpart $srcdir
-		tsize=$(df -k | fgrep $dpart | awk '{print $3}')
-		echo "Size: $tsize"
-		[ $tsize -gt 1232896 ] && \
-		echo "Copying files in $dpart, $tsize KBytes, Please wait for a while..."
-		pushd $srcdir
-		sudo find . -print | sudo cpio --block-size=256 -o | \
-			dd of=$target_dir/sys_disk_${LABEL}.cpio obs=128K
-		popd
-		sudo umount $dpart
+		{
+			sudo mount -t $TYPE -o ro $dpart $srcdir
+			tsize=$(df -k | fgrep $dpart | awk '{print $3}')
+			echo "Size: $tsize"
+			[ $tsize -gt 1232896 ] && \
+			echo "Copying files in $dpart, $tsize KBytes, Please wait for a while..."
+			pushd $srcdir
+			sudo find . -print | sudo cpio --block-size=256 -o | \
+				dd of=$target_dir/sys_disk_${LABEL}.cpio obs=128K
+			popd
+			echo "Umounting $dpart"
+			sudo umount $dpart
+			sudo sync
+		} &
+		fin=0
+		dots=0
+		while jobs %% > /dev/null 2>&1; do
+			echo -n .
+			dots=$((dots+1))
+			if [ $((dots%80)) -eq 0 ]; then
+				echo
+			fi
+			if [ $fin -ne 0 ]; then
+				kill %%
+				abnormal
+			fi
+			sleep 1
+		done
 	done < $target_dir/sys_disk_partitions.txt
 	rmdir $srcdir
 	#
@@ -335,14 +353,31 @@ function restore_to()
 		esac
 		[ "$TYPE" = "swap" -o "$TYPE" = "ext2" ] && continue
 #
-		sudo mount -t $TYPE $device /mnt
-		pushd /mnt
-		echo "Restoring contents from $srcpath/sys_disk_${LABEL}.cpio ..."
-		sudo cpio --block-size=256 -id < $srcpath/sys_disk_${LABEL}.cpio
-		[ "$LABEL" = "LIOS_ESP" -a -f EFI/debian/shimx64.efi ] && \
-			UEFIBOOT=1
-		popd
-		sudo umount /mnt
+		fin=0
+		dots=0
+		{
+			sudo mount -t $TYPE $device /mnt
+			pushd /mnt
+			echo "Restoring contents from $srcpath/sys_disk_${LABEL}.cpio ..."
+			sudo cpio --block-size=256 -id < $srcpath/sys_disk_${LABEL}.cpio
+			[ "$LABEL" = "LIOS_ESP" -a -f EFI/debian/shimx64.efi ] && \
+				UEFIBOOT=1
+			popd
+			echo "Umounting $device"
+			sudo umount /mnt
+		} &
+		while jobs %% > /dev/null 2>&1; do
+			echo -n .
+			dots=$((dots+1))
+			if [ $((dots%80)) -eq 0 ]; then
+				echo
+			fi
+			if [ $fin -ne 0 ]; then
+				kill %%
+				abnormal
+			fi
+			sleep 1
+		done
 	done < /tmp/sys_disk_partitions.txt
 	bootstrap_setup $srcpath $target
 }

@@ -75,9 +75,10 @@ function cleanup()
 	fi
 	[ -f $biosdat ] && rm $biosdat
 	[ -f mbr.dat ] && rm mbr.dat
+	exit 1
 }
 #
-trap cleanup EXIT INT
+trap fin=1 EXIT INT
 #
 sudo blockdev --rereadpt $device
 sudo mkfs.vfat -F 32 -n ESPFS ${device}1
@@ -90,36 +91,71 @@ find ./EFI -print | sudo cpio --block-size=256 -pd /mnt
 popd
 sudo umount /mnt
 #
-sudo mount ${device}2 /mnt
-pushd ${cdmedium}
-echo -n "Copying Live OS ..."
-find . -print | sudo cpio --block-size=256 -pd /mnt
-echo
-popd
-echo -n "Umounting U Disk, will take several minutes..."
-sudo umount /mnt
-echo
-#
-sudo mount ${device}3 /mnt
-sudo chown 1000:1000 /mnt
-cursize=$(df -k | fgrep /var/www/html/debian | awk '{print $3}')
-cursize=$((cursize+128))
-dstsize=$(df -k | fgrep /mnt | awk '{print $4}')
-if [ $cursize -gt 1048576 -a $dstsize -gt $cursize ]
-then
-	read -p "Would you like copy current debian packages?($((cursize/1048576))G) " ans
-	if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
-	then
-		echo -n "Copying $cursize K Bytes, Please be patient..."
-		( cd /var/www/html/debian && find . -print | cpio --block-size=256 -pd /mnt )
-		echo "Complete"
+{ \
+	sudo mount ${device}2 /mnt
+	pushd ${cdmedium}
+	echo "Copying Live OS"
+	find . -print | sudo cpio --block-size=256 -pd /mnt
+	echo
+	popd
+	echo -n "Umounting U Disk, will take several minutes..."
+	sudo umount /mnt
+	echo
+} &
+fin=0
+dots=0
+while jobs %% > /dev/null 2>&1; do
+	echo -n .
+	dots=$((dots+1))
+	if [ $((dots%80)) -eq 0 ]; then
+		echo
 	fi
-
-fi
+	if [ $fin -ne 0 ]; then
+		kill %%
+		cleanup
+	fi
+	sleep 1
+done
 #
-echo -n "Unmounting /mnt ..."
-sudo umount /mnt
-echo ""
+{
+	cpdepot=0
+	sudo mount ${device}3 /mnt
+	sudo chown 1000:1000 /mnt
+	cursize=$(df -k | fgrep /var/www/html/debian | awk '{print $3}')
+	cursize=$((cursize+128))
+	dstsize=$(df -k | fgrep /mnt | awk '{print $4}')
+	if [ $cursize -gt 1048576 -a $dstsize -gt $cursize ]
+	then
+		read -p "Would you like copy current debian packages?($((cursize/1048576))G) " ans
+		if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
+		then
+			cpdepot=1
+			echo -n "Copying $cursize K Bytes, Please be patient..."
+			pushd /var/www/html/debian
+			find . -print | cpio --block-size=256 -pd /mnt
+			popd
+			echo "Complete"
+		fi
+	fi
+#
+	[ $cpdepot -eq 1 ] && echo -n "Unmounting /mnt ..."
+	sudo umount /mnt
+	echo ""
+} &
+fin=0
+dots=0
+while jobs %% > /dev/null 2>&1 ; do
+	echo -n .
+	dots=$((dots+1))
+	if [ $((dots%80)) -eq 0 ]; then
+		echo
+	fi
+	if [ $fin -ne 0 ]; then
+		kill %%
+		cleanup
+	fi
+	sleep 1
+done
 #
 # setup legacy bios boot code
 #
@@ -130,7 +166,7 @@ function setup_legacy()
 	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat oflag=direct
 	sudo dd if=$biosdat of=${device} bs=512 skip=1 seek=1 oflag=direct conv=nocreat
 }
-lineno=140
+lineno=176
 tail --lines=+${lineno} ${0} > $biosdat
 touch mbr.dat
 setup_legacy
