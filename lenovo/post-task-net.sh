@@ -103,7 +103,15 @@ then
 	sync && fatlabel $efidev LIOS_ESP && sync
 fi
 #
-endline=115
+# set /etc/NetworkManager/NetworkManager.conf ethernet.wake-on-lan=g
+#
+netconfdir=$TARGET/etc/NetworkManager/conf.d
+[ -d $netconfdir ] && cat > $netconfdir/999ethernet-wol.conf <<-EOD
+	[connection-ethernet]
+	ethernet.wake-on-lan=64
+EOD
+#
+endline=123
 #
 [ -f $TARGET/etc/rc.local ] && mv $TARGET/etc/rc.local $TARGET/etc/rc.local.orig
 #
