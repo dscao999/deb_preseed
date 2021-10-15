@@ -174,7 +174,7 @@ fi
 wdir=${PWD}
 [ -n "${passed}" ] && spassed="s;\(user-password-crypted password \).*$;\1$passed;"
 #
-fln=282
+fln=290
 tail -n +${fln} $0 > ${srciso}
 sudo mount -o ro ${srciso} ${srcdir}
 loopdev=$(sudo losetup|fgrep ${srciso})
@@ -220,9 +220,12 @@ edlidm=
 #
 #  adapt ip in preseed.cfg to current IP
 #
+echo "Waiting for an ethernet to be online"
 hit=0
+count=0
 while [ $hit -eq 0 ]
 do
+	echo -n .
 	for nic in $(ls /sys/class/net)
 	do
 		type=$(cat /sys/class/net/$nic/type)
@@ -237,6 +240,11 @@ do
 		fi
 	done
 	sleep 3
+	count=$((count+1))
+	if [ $count -eq 10 ]; then
+		echo "No network cable online"
+		break
+	fi
 done
 if [ $hit -eq 0 ]
 then
