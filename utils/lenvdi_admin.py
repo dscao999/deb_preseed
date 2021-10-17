@@ -3,6 +3,7 @@
 import os
 import subprocess as subproc
 import gi
+import re
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -48,16 +49,34 @@ class EchoInfo(Gtk.MessageDialog):
                 text=info
                 )
 
-def ping_ip(ip, rootwin):
-    cmd = 'nslookup ' + ip
-    retv = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
-            shell=True, text=True)
-    if retv.returncode != 0:
-        echo = EchoInfo(rootwin, ip + ' check failed')
+def ping_ip(expstr, rootwin, ip=0, fqn=0):
+    fqnre = re.compile('([a-z][a-z0-9]*\.)*[a-z][a-z0-9]*')
+    ipre = re.compile('([0-9]+\.){3,3}[0-9]+')
+    retcode = 1
+    span = (1, 0)
+    if ip == 1:
+        res = ipre.match(expstr)
+        if res:
+            span = res.span()
+    elif fqn == 1:
+        res = fqnre.match(expstr)
+        if res:
+            span = res.span()
+    else:
+        res = fqnre.match(expstr)
+        if res:
+            span = res.span()
+        if span[0] != 0 or span[1] != len(expstr):
+            res = ipre.match(expstr)
+            if res:
+                span = res.span()
+    if res and span[0] == 0 and span[1] == len(expstr):
+        retcode = 0
+    else:
+        echo = EchoInfo(rootwin, expstr + ' check failed')
         echo.run()
         echo.destroy()
-
-    return retv.returncode
+    return retcode
 
 class CABox(Gtk.Box):
     def __init__(self, rootwin):
@@ -399,16 +418,15 @@ class VDIBox(Gtk.Box):
 
     def save_service_ip(self, but):
         svrname = self.name_entry.get_text()
-        if self.use_dns:
-            retv = ping_ip(svrname, self.rootwin)
-            if retv != 0:
-                echo = EchoInfo(rootwin, ip + ' check failed')
-                echo.run()
-                echo.destroy()
-            return
-
         ip = self.ip_entry.get_text()
         if not svrname or not ip:
+            return
+
+        retv = ping_ip(svrname, self.rootwin, fqn=1)
+        if retv != 0:
+            return
+        retv = ping_ip(ip, self.rootwin, ip=1)
+        if retv != 0:
             return
 
         with open("/etc/hosts", "r") as fin:

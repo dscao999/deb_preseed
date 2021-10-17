@@ -232,17 +232,17 @@ class MWindow(Gtk.Window):
         hbox = Gtk.Box(homogeneous=False)
         vbox.pack_start(hbox, True, True, 0)
 
-        nic_label = Gtk.Label(_("Nic Port"))
+        nic_label = Gtk.Label(label=_("Nic Port"))
         nic_label.set_width_chars(10)
         hbox.pack_start(nic_label, False, True, 0)
-        mac_label = Gtk.Label(_("Mac Addr"))
+        mac_label = Gtk.Label(label=_("Mac Addr"))
         mac_label.set_width_chars(16)
         hbox.pack_start(mac_label, True, True, 0)
-        wir_label = Gtk.Label(_("WIFI"))
+        wir_label = Gtk.Label(label=_("WIFI"))
         hbox.pack_start(wir_label, False, True, 0)
-        upd_label = Gtk.Label(_("Up/Down"))
+        upd_label = Gtk.Label(label=_("Up/Down"))
         hbox.pack_start(upd_label, False, True, 15)
-        ip_label = Gtk.Label(_("IP Address"))
+        ip_label = Gtk.Label(label=_("IP Address"))
         hbox.pack_start(ip_label, True, True, 1)
 
         nrow += 1
@@ -287,10 +287,10 @@ class MWindow(Gtk.Window):
         hbox = Gtk.Box()
         vbox.pack_start(hbox, True, True, 1)
 
-        l_cpumod = Gtk.Label(_("CPU Model"))
+        l_cpumod = Gtk.Label(label=_("CPU Model"))
         l_cpumod.set_width_chars(40)
         hbox.pack_start(l_cpumod, True, True, 0)
-        l_cpunum = Gtk.Label(_("Count"))
+        l_cpunum = Gtk.Label(label=_("Count"))
         hbox.pack_start(l_cpunum, True, True, 5)
 
         ih = 1

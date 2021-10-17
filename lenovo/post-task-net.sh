@@ -260,8 +260,8 @@ done
 #
 cat > /home/$auto_user/.i18n <<"ENDDOC"
 LANG=zh_CN.utf8
-ulimit -c 819200
 ENDDOC
+chown $auto_user:$auto_user /home/$auto_user/.i18n
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
 ##
@@ -272,6 +272,7 @@ if [ -r $PWD/.i18n ]
 then
 	. ${PWD}/.i18n
 fi
+ulimit -c 819200
 ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
