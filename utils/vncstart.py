@@ -14,6 +14,8 @@ from gi.repository import Gtk, GLib
 
 locale.setlocale(locale.LC_ALL, '')
 _ = gettext.gettext
+gettext.bindtextdomain("vncstart")
+gettext.textdomain('vncstart')
 
 lock_file = "/run/lock/admin_assist.lock"
 
@@ -46,7 +48,7 @@ class CheckConnection(threading.Thread):
                     cot = mesg.read()
                     self.offset = mesg.tell()
                     mesg.close()
-                    con = cot.find('rfbProcessClientNormalMessage: ')
+                    con = cot.find('Got connection from client')
                     if con != -1:
                         GLib.idle_add(self.win.win_quit)
                         self.gui_gone = 1
@@ -142,7 +144,7 @@ class MainWin(Gtk.Window):
         ypos += 1
 
         alphabet = string.ascii_letters + string.digits
-        self.password = ''.join(secrets.choice(alphabet) for i in range(8))
+        self.password = ''.join(secrets.choice(alphabet) for i in range(6))
         label = Gtk.Label(label=_('Password:'))
         label.set_max_width_chars(12)
         label.set_xalign(1)
@@ -163,7 +165,7 @@ class MainWin(Gtk.Window):
     def check_for_connection(self):
         self.echo_show += 1
         if self.echo_show % 2 == 0:
-            self.echo.set_text('----------------------')
+            self.echo.set_text('----------------')
         else:
             self.echo.set_text(_('Waiting for connection'))
 
