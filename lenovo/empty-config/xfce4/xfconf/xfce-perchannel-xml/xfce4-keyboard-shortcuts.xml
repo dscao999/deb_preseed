@@ -26,6 +26,9 @@
         <property name="startup-notify" type="bool" value="true"/>
       </property>
       <property name="override" type="bool" value="true"/>
+      <property name="XF86Display" type="string" value="xfce4-display-settings --minimal"/>
+      <property name="&lt;Super&gt;p" type="string" value="xfce4-display-settings --minimal"/>
+      <property name="&lt;Super&gt;BackSpace" type="string" value="vncstart.py"/>
     </property>
   </property>
   <property name="xfwm4" type="empty">
