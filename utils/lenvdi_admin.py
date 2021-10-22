@@ -4,9 +4,11 @@ import os
 import subprocess as subproc
 import gi
 import re
+import threading
+import time
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk, GLib
 
 os.environ['SUDO_ASKPASS'] = '/usr/lib/ssh/x11-ssh-askpass'
 
@@ -19,26 +21,32 @@ timeconf = '/etc/systemd/timesyncd.conf'
 
 vdiadm = 'vdi-admin.sh'
 
-def vdi_admin(action, **kargs):
+vdimesg = {
+        "setvdi": ("IP and FQDN added to /etc/hosts", "Fail to Change /etc/hosts"),
+        "time_sync": ("/etc/systemd/timesyncd.conf Changed.", "Failed to change /etc/systemd/timesyncd.conf"),
+        "import_ca": ("CA Import Success!", "CA Import Failed"),
+        "set-hostname": ("hostname changed", "Fail to Change host name"),
+        }
+
+def vdi_admin(rootwin, **kargs):
     cmd = 'sudo -A ' + vdiadm
-    if action == 'import_ca':
+    if rootwin.action == 'import_ca':
         cmd += ' --client=' + kargs["client"]
         cmd += ' --rootca=' + kargs["rootca"]
-    elif action == 'setvdi':
+    elif rootwin.action == 'setvdi':
         cmd += ' --sname=' + kargs["sname"]
         cmd += ' --sip=' + kargs["sip"]
-    elif action == 'time_sync':
+    elif rootwin.action == 'time_sync':
         cmd += ' --ntp="' + kargs["ntp"] + '"'
-    elif action == 'set-hostname':
+    elif rootwin.action == 'set-hostname':
         cmd += ' --hostname=' + kargs["hostname"]
     else:
         print("Not a valid action")
         return
 
-    cmd += ' ' + action
-    res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
+    cmd += ' ' + rootwin.action
+    rootwin.res = subproc.run(cmd, stdout=subproc.PIPE, stderr=subproc.STDOUT,
             shell=True, text=True)
-    return (res.returncode, res.stdout)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -169,22 +177,16 @@ class CABox(Gtk.Box):
             if resp == Gtk.ResponseType.CANCEL:
                     return
 
-        res = vdi_admin("import_ca", client=self.client, rootca=self.cafile)
-        if res[0] != 0:
-            dialog = Gtk.MessageDialog(
-                    parent=self.rootwin,
-                    flags=0,
-                    message_type=Gtk.MessageType.ERROR,
-                    buttons=Gtk.ButtonsType.CANCEL,
-                    text="CA Import Failed"
-                    )
-            dialog.format_secondary_text(res[1])
-            dialog.run()
-            dialog.destroy()
-        else:
-            dialog = EchoInfo(self.rootwin, "CA Import Success!")
-            dialog.run()
-            dialog.destroy()
+        self.rootwin.set_sensitive(False)
+        wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
+        self.rootwin.get_window().set_cursor(wcursor)
+        self.rootwin.action = 'import_ca'
+        self.rootwin.task = threading.Thread(target=vdi_admin,
+                args=(self.rootwin,), kwargs={"client": self.client, "rootca": self.cafile})
+        self.rootwin.task.start()
+        GLib.idle_add(self.rootwin.check_task)
+
+#        res = vdi_admin("import_ca", client=self.client, rootca=self.cafile)
 
 class TimerBox(Gtk.Box):
     def __init__(self, rootwin):
@@ -291,22 +293,17 @@ class TimerBox(Gtk.Box):
             ntp_line += ip
             idx += 1
             row = self.ip_list.get_row_at_index(idx)
-        res = vdi_admin('time_sync', ntp=ntp_line)
-        if res[0] != 0:
-            dialog = Gtk.MessageDialog(
-                    parent=self.rootwin,
-                    flags=0,
-                    message_type=Gtk.MessageType.ERROR,
-                    buttons=Gtk.ButtonsType.CANCEL,
-                    text="Failed to change /etc/systemd/timesyncd.conf"
-                    )
-            dialog.format_secondary_text(res[1])
-            dialog.run()
-            dialog.destroy()
-        else:
-            dialog = EchoInfo(self.rootwin, "/etc/systemd/timesyncd.conf Changed.")
-            dialog.run()
-            dialog.destroy()
+
+        self.rootwin.set_sensitive(False)
+        wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
+        self.rootwin.get_window().set_cursor(wcursor)
+        self.rootwin.action = 'time_sync'
+        self.rootwin.task = threading.Thread(target=vdi_admin,
+                args=(self.rootwin,), kwargs={"ntp": ntp_line})
+        self.rootwin.task.start()
+        GLib.idle_add(self.rootwin.check_task)
+
+#        res = vdi_admin('time_sync', ntp=ntp_line)
 
 def get_hostname():
     cmd = 'hostnamectl --static'
@@ -322,22 +319,17 @@ class HostBox(Gtk.Box):
             dialog.run()
             dialog.destroy()
             return
-        res = vdi_admin('set-hostname', hostname=newname);
-        if res[0] != 0:
-            dialog = Gtk.MessageDialog(
-                    parent=self.rootwin,
-                    flags=0,
-                    message_type=Gtk.MessageType.ERROR,
-                    buttons=Gtk.ButtonsType.CANCEL,
-                    text="Fail to Change host name"
-                    )
-            dialog.format_secondary_text(res[1])
-            dialog.run()
-            dialog.destroy()
-        else:
-            dialog = EchoInfo(self.rootwin, "hostname changed to: "+newname)
-            dialog.run()
-            dialog.destroy()
+
+        self.rootwin.set_sensitive(False)
+        wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
+        self.rootwin.get_window().set_cursor(wcursor)
+        self.rootwin.action = 'set-hostname'
+        self.rootwin.task = threading.Thread(target=vdi_admin,
+                args=(self.rootwin,), kwargs={"hostname": newname})
+        self.rootwin.task.start()
+        GLib.idle_add(self.rootwin.check_task)
+
+#        res = vdi_admin('set-hostname', hostname=newname);
 
     def __init__(self, rootwin):
         super().__init__(spacing=6, orientation=Gtk.Orientation.VERTICAL)
@@ -412,11 +404,15 @@ class VDIBox(Gtk.Box):
         if but.get_active():
             self.use_dns = True
             self.ip_entry.set_editable(False)
+            self.name_entry.set_editable(False)
         else:
             self.use_dns = False
             self.ip_entry.set_editable(True)
+            self.name_entry.set_editable(True)
 
     def save_service_ip(self, but):
+        if self.use_dns:
+            return
         svrname = self.name_entry.get_text()
         ip = self.ip_entry.get_text()
         if not svrname or not ip:
@@ -448,23 +444,16 @@ class VDIBox(Gtk.Box):
                     if resp == Gtk.ResponseType.CANCEL:
                         return
                 
-        res = vdi_admin('setvdi', sname=svrname, sip=ip)
-        if res[0] != 0:
-            dialog = Gtk.MessageDialog(
-                    parent=self.rootwin,
-                    flags=0,
-                    message_type=Gtk.MessageType.ERROR,
-                    buttons=Gtk.ButtonsType.CANCEL,
-                    text="Fail to Change /etc/hosts"
-                    )
-            dialog.format_secondary_text(res[1])
-            dialog.run()
-            dialog.destroy()
-        else:
-            dialog = EchoInfo(self.rootwin, "IP and FQDN added to /etc/hosts")
-            dialog.run()
-            dialog.destroy()
+        self.rootwin.set_sensitive(False)
+        wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
+        self.rootwin.get_window().set_cursor(wcursor)
+        self.rootwin.action = 'setvdi'
+        self.rootwin.task = threading.Thread(target=vdi_admin,
+                args=(self.rootwin,), kwargs={"sname": svrname, "sip": ip})
+        self.rootwin.task.start()
+        GLib.idle_add(self.rootwin.check_task)
 
+#        res = vdi_admin('setvdi', sname=svrname, sip=ip)
 
 class MainWin(Gtk.Window):
     def __init__(self):
@@ -503,6 +492,35 @@ class MainWin(Gtk.Window):
         vbox.pack_start(stack_switcher, True, True, 0)
         vbox.pack_start(stack, True, True, 0)
 
+        self.task = None
+
+    def check_task(self):
+        if not self.task:
+            return False
+        if self.task.is_alive():
+            time.sleep(0.2)
+            return True
+
+        if self.res.returncode != 0:
+            dialog = Gtk.MessageDialog(
+                    parent=self,
+                    flags=0,
+                    message_type=Gtk.MessageType.ERROR,
+                    buttons=Gtk.ButtonsType.CANCEL,
+                    text=vdimesg[self.action][1]
+                    )
+            dialog.format_secondary_text(self.res.stdout)
+            dialog.run()
+            dialog.destroy()
+        else:
+            dialog = EchoInfo(self, vdimesg[self.action][0])
+            dialog.run()
+            dialog.destroy()
+        wcursor = Gdk.Cursor(Gdk.CursorType.ARROW)
+        self.get_window().set_cursor(wcursor)
+        self.set_sensitive(True)
+        return False
+
 try:
     fd = os.open("/run/lock/lenvdi_admin.lock", os.O_WRONLY|os.O_CREAT|os.O_EXCL)
 except:
@@ -522,5 +540,7 @@ win = MainWin()
 win.connect("destroy", Gtk.main_quit)
 win.show()
 Gtk.main()
+while win.task and win.task.is_alive():
+    time.sleep(0.4)
 os.remove("/run/lock/lenvdi_admin.lock")
 quit(0)
