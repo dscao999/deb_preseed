@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-TARGS=$(getopt -l label:,output: -o l:o: -- "$@")
+TARGS=$(getopt -l label:,output:,efi: -o l:o: -- "$@")
 [ $? -ne 0 ] && exit 1
 #
 LABEL=LENOVO_LIOS_V2_AMD64
@@ -9,6 +9,10 @@ EFIIMAGE=boot/grub/efi.img
 eval set -- $TARGS
 while true; do
 	case "$1" in
+	"--efi")
+		EFIIMAGE=$2
+		shift
+		;;
 	"--label")
 		LABEL=$2
 		shift
