@@ -42,13 +42,12 @@ ISODIR=$1
 function mkiso()
 {
 	[ -z "$ISODIR" ] && ISODIR=isotop
-	if [ ! -d "$ISODIR" ]
-	then
+	if [ ! -d "$ISODIR" ]; then
 		echo "Invalid ISO Top Directory: $ISODIR"
 		exit 1
 	fi
-	[ -z "$OUTISO" ] && OUTISO=-
 	[ -f "$OUTISO" ] && rm $OUTISO
+	[ -z "$OUTISO" ] && OUTISO=-
 	#
 	chmod u+w ${ISODIR}/isolinux/isolinux.bin
 	cp /usr/lib/ISOLINUX/isolinux.bin $ISODIR/isolinux/isolinux.bin
