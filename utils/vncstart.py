@@ -10,14 +10,14 @@ import locale
 import gettext
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Gdk
 
 locale.setlocale(locale.LC_ALL, '')
 _ = gettext.gettext
 gettext.bindtextdomain("vncstart")
 gettext.textdomain('vncstart')
 
-lock_file = "/run/lock/admin_assist.lock"
+lock_file = "/run/lock/lenvdi_admin_assist.lock"
 
 class CheckConnection(threading.Thread):
     def __init__(self, win):
@@ -44,7 +44,7 @@ class CheckConnection(threading.Thread):
             except subp.TimeoutExpired:
                 if self.gui_gone == 0:
                     mesg = open("./x11vnc.log", "r")
-                    mesg.seek(self.offset, 0)
+                    mesg.seek(self.offset)
                     cot = mesg.read()
                     self.offset = mesg.tell()
                     mesg.close()
@@ -96,12 +96,19 @@ def get_addr(sock):
             addr.append((iface[1], ip))
     return addr
 
+label_font = b'grid * {font: 24px Sans; }'
+
 class MainWin(Gtk.Window):
     def __init__(self):
         super().__init__(title=_("LENVDI Admin Assist"))
         self.set_border_width(10)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+        csspv = Gtk.CssProvider()
+        csspv.load_from_data(label_font)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), csspv,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         addr_info = get_addr(sock)
         grid = Gtk.Grid()
         grid.set_column_spacing(20)

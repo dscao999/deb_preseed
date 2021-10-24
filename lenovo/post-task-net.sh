@@ -348,6 +348,7 @@ elif dpkg --list lidc-client; then
 		cp $appdesk/lidc-client.desktop /home/lenovo/.config/$defdesk
 	fi
 elif [ -f $appdesk/seturl.desktop ]; then
+	cp $appdesk/exo-web-browser.desktop /home/$auto_user/.config/$usrdesk
 	firstshot=.config/autostart/first-shot.desktop
 	eval su - $auto_user -c \'"cp $appdesk/seturl.desktop $firstshot"\'
 fi
