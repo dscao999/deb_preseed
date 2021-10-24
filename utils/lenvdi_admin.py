@@ -516,8 +516,7 @@ class MainWin(Gtk.Window):
             dialog = EchoInfo(self, vdimesg[self.action][0])
             dialog.run()
             dialog.destroy()
-        wcursor = Gdk.Cursor(Gdk.CursorType.ARROW)
-        self.get_window().set_cursor(wcursor)
+        self.get_window().set_cursor(self.cursor)
         self.set_sensitive(True)
         return False
 
@@ -539,6 +538,7 @@ os.close(fd)
 win = MainWin()
 win.connect("destroy", Gtk.main_quit)
 win.show()
+win.cursor = win.get_window().get_cursor()
 Gtk.main()
 while win.task and win.task.is_alive():
     time.sleep(0.4)

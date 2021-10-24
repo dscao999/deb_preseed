@@ -168,9 +168,11 @@ class MainWin(Gtk.Window):
             self.echo.set_text('----------------')
         else:
             self.echo.set_text(_('Waiting for connection'))
+        return False
 
     def win_quit(self):
         Gtk.main_quit()
+        return False
 
 try:
     fd = os.open(lock_file, os.O_WRONLY|os.O_CREAT|os.O_EXCL)
