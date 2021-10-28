@@ -3,7 +3,7 @@
 import gi
 import locale
 import gettext
-import os
+import os, fcntl
 import re
 
 gi.require_version("Gtk", "3.0")
@@ -21,7 +21,25 @@ class EchoInfo(Gtk.MessageDialog):
                 buttons=Gtk.ButtonsType.OK,
                 text=info)
 
-def lsdisk():
+def iscdrom(path, rootwin):
+    try:
+        cdrom = open(path, 'rb')
+    except PermissionError:
+        echo = EchoInfo(rootwin, "Permission Denied! Please try SUDO")
+        echo.run()
+        echo.destroy()
+        exit(1)
+
+    cdfd = cdrom.fileno()
+    CDROM_GET_CAPABILITY = 0x5331
+    try:
+        res = fcntl.ioctl(cdfd, CDROM_GET_CAPABILITY, 0)
+        iscd = True
+    except:
+        iscd = False
+    return iscd
+
+def lsdisk(rootwin):
     tpath = '/dev/disk/by-path'
     with os.scandir(tpath) as lndevs:
         devpairs = [('None', 'None')]
@@ -33,6 +51,8 @@ def lsdisk():
             usb = pname.find("usb")
             if part != -1 or usb != -1:
                 continue
+            if iscdrom(tpath+'/'+pname, rootwin):
+                continue
 
             tname = os.readlink(tpath+'/'+pname)
             slash = tname.rfind('/')
@@ -41,7 +61,7 @@ def lsdisk():
             curtup = (pname, '/dev/'+tname)
             skip = 0
             for tup in devpairs:
-                if tup == curtup:
+                if tup[1] == curtup[1]:
                     skip = 1
                     break
             if skip == 1:
@@ -73,17 +93,22 @@ class MainWin(Gtk.Window):
         label = Gtk.Label(label=_('OS Disk 1:'))
         label.show()
         grid.attach(label, 0, 1, 1, 1)
-        self.disks = lsdisk()
+        self.disks = lsdisk(self)
         self.seldsk1 = Gtk.ComboBoxText()
         self.seldsk1.set_entry_text_column(0)
+        actnum = 0
+        idx = 0
         for disk in self.disks:
             self.seldsk1.append_text(disk[0])
-        self.seldsk1.set_active(0)
+            if actnum == 0 and disk[0].find("nvme") != -1:
+                actnum = idx
+            idx += 1
+        self.seldsk1.set_active(actnum)
         self.seldsk1.connect("changed", self.on_disk_changed)
         self.seldsk1.show()
         grid.attach(self.seldsk1, 1, 1, 1, 1)
         self.ddev1 = Gtk.Entry()
-        self.ddev1.set_text(self.disks[0][1])
+        self.ddev1.set_text(self.disks[actnum][1])
         self.ddev1.set_max_width_chars(12)
         self.ddev1.set_editable(False)
         self.ddev1.show()
@@ -92,7 +117,7 @@ class MainWin(Gtk.Window):
         label = Gtk.Label(label=_('OS Disk 2:'))
         label.show()
         grid.attach(label, 0, 2, 1, 1)
-        self.disks = lsdisk()
+        self.disks = lsdisk(self)
         self.seldsk2 = Gtk.ComboBoxText()
         self.seldsk2.set_entry_text_column(0)
         for disk in self.disks:
@@ -150,8 +175,6 @@ class MainWin(Gtk.Window):
             echo.destroy()
             return
 
-        print("OK Clicked")
-
     def on_disk_changed(self, combo):
         text = combo.get_active_text()
         if text:
@@ -167,5 +190,4 @@ win = MainWin()
 win.show()
 win.connect("destroy", Gtk.main_quit)
 Gtk.main()
-devs = lsdisk()
 exit(0)
