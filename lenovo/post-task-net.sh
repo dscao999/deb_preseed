@@ -353,6 +353,13 @@ elif [ -f $appdesk/seturl.desktop ]; then
 	eval su - $auto_user -c \'"cp $appdesk/seturl.desktop $firstshot"\'
 fi
 #
+if dpkg --list jpeg-player > /dev/null 2>&1; then
+	rm -f /etc/xdg/autostart/jpeg-player.desktop
+	if ! fgrep jpeg-player /home/$auto_user/.xsessionrc > /dev/null 2>&1; then
+		sed -i -e '$a/usr/bin/jpeg-player -m 1 &' /home/$auto_user/.xsessionrc
+	fi
+fi
+#
 rm -f $vminstf $icaclient $xfce_empty $xfce_def $bigagent
 #
 plymouth-set-default-theme -R lenvdi
