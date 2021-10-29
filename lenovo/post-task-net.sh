@@ -273,6 +273,7 @@ then
 	. ${PWD}/.i18n
 fi
 ulimit -c 819200
+setxkbmap -option srvrkeys:none
 ENDDOC
 #
 chown ${auto_user}:${auto_user} /home/$auto_user/.xsessionrc
