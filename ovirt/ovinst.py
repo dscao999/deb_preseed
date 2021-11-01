@@ -54,6 +54,8 @@ blacklist {
 	property "ID_USB_INTERFACE_NUM"
 	property "ID_CDROM"
 }
+
+systemctl disable iscsid.socket iscsid.service fcoe.service
 EOD
 
 %end
@@ -99,12 +101,17 @@ ovirt_port2 = '$oport2'
 gluster_port1 = '$gport1'
 gluster_port2 = '$gport2'
 
-def lsnet(nicpath):
+def lsnet(nicpci):
     netdir = '/sys/class/net'
-    lports = os.listdir(netdir)
-    for port in lports:
-        link = os.readlink(netdir+'/'+port)
-        if link.find(nicpath) != -1:
+    ports = os.listdir(netdir)
+    for port in ports:
+        nicpath = netdir + '/' + port
+        if not os.path.islink(nicpath):
+            continue
+        link = os.readlink(nicpath)
+        if link.find('virtual') != -1 or link.find('usb') != -1:
+            continue
+        if link.find(nicpci) != -1:
             return port
     return None
  
@@ -224,6 +231,7 @@ def lsnet(rootwin):
     tpath = '/sys/class/net'
     nports = []
     with os.scandir(tpath) as lndevs:
+        pcire = re.compile('[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]')
         for lndev in lndevs:
             pname = lndev.name
             if not lndev.is_symlink():
@@ -239,11 +247,20 @@ def lsnet(rootwin):
             if slash == -1:
                 continue
             tname = tname[:slash]
-            slash = tname.rfind('/')
-            nic = tname[slash+1:]
+
+            pcihit = 0
+            while pcihit == 0:
+                slash = tname.rfind('/')
+                nic = tname[slash+1:]
+                res = pcire.match(nic)
+                if not res or res.start() != 0 or res.end() != len(nic):
+                    tname = tname[:slash]
+                    continue
+                pcihit = 1
+
             skip = 0
             for nport in nports:
-                if nic == nport:
+                if nic == nport[0]:
                     skip = 1
                     break
             if skip == 1:
@@ -282,20 +299,20 @@ class MainWin(Gtk.Window):
         label = Gtk.Label(label=_("  Host Name: "), halign=Gtk.Align.END)
         label.set_max_width_chars(20)
         label.show()
-        grid.attach(label, 0, 0, 1, 1)
+        grid.attach(label, 1, 0, 1, 1)
         self.hentry = Gtk.Entry()
         self.hentry.set_max_width_chars(12)
         self.hentry.show()
-        grid.attach(self.hentry, 1, 0, 2, 1)
+        grid.attach(self.hentry, 2, 0, 1, 1)
         row = 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
         sep = Gtk.Label(label=_("OS Root Disk"))
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
 
         label = Gtk.Label(label=_('OS Disk:'), halign=Gtk.Align.END)
@@ -320,7 +337,7 @@ class MainWin(Gtk.Window):
         self.ddev1.set_max_width_chars(12)
         self.ddev1.set_editable(False)
         self.ddev1.show()
-        grid.attach(self.ddev1, 2, row, 1, 1)
+        grid.attach(self.ddev1, 2, row, 2, 1)
         row += 1
 
         self.seldsk2 = Gtk.ComboBoxText()
@@ -336,28 +353,22 @@ class MainWin(Gtk.Window):
         self.ddev2.set_max_width_chars(12)
         self.ddev2.set_editable(False)
         self.ddev2.show()
-        grid.attach(self.ddev2, 2, row, 1, 1)
+        grid.attach(self.ddev2, 2, row, 2, 1)
         row += 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
         sep = Gtk.Label(label=_("\nOvirt Management Network"))
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
 
         self.nports = lsnet(self)
         label = Gtk.Label(label=_('ovirt port:'), halign=Gtk.Align.END)
         label.show()
         grid.attach(label, 0, row, 1, 2)
-
-        smgrid = Gtk.Grid()
-        smgrid.set_column_homogeneous(False)
-        smgrid.set_row_homogeneous(True)
-        smgrid.show()
-        grid.attach(smgrid, 1, row, 2, 2)
 
         self.ovirt_port1 = Gtk.ComboBoxText()
         self.ovirt_port1.set_entry_text_column(0)
@@ -366,17 +377,17 @@ class MainWin(Gtk.Window):
         sel = 0
         self.ovirt_port1.set_active(sel)
         self.ovirt_port1.show()
-        smgrid.attach(self.ovirt_port1, 0, 0, 1, 1)
+        grid.attach(self.ovirt_port1, 1, row, 1, 1)
         self.ovirt_port1.connect("changed", self.port_changed)
-        self.ovirt_port1_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.END)
+        self.ovirt_port1_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
         self.ovirt_port1_label.set_max_width_chars(12)
         self.ovirt_port1_label.show()
-        smgrid.attach(self.ovirt_port1_label, 1, 0, 1, 1)
+        grid.attach(self.ovirt_port1_label, 2, row, 1, 1)
 
         self.ovirt_ip = Gtk.Entry()
         self.ovirt_ip.set_text("192.168.98.1")
         self.ovirt_ip.show()
-        grid.attach(self.ovirt_ip, 2, row, 1, 2)
+        grid.attach(self.ovirt_ip, 3, row, 1, 2)
         row += 1
 
         self.ovirt_port2 = Gtk.ComboBoxText()
@@ -389,32 +400,27 @@ class MainWin(Gtk.Window):
         else:
             sel = 0
             self.ovirt_port2.set_active(0)
-        smgrid.attach(self.ovirt_port2, 0, 1, 1, 1)
+        grid.attach(self.ovirt_port2, 1, row, 1, 1)
         self.ovirt_port2.show()
         self.ovirt_port2.connect("changed", self.port_changed)
-        self.ovirt_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.END)
+        self.ovirt_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
         self.ovirt_port2_label.set_max_width_chars(12)
         self.ovirt_port2_label.show()
-        smgrid.attach(self.ovirt_port2_label, 1, 1, 1, 1)
+        grid.attach(self.ovirt_port2_label, 2, row, 1, 1)
         row += 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
         sep = Gtk.Label(label=_("\nGlusterFS Network"))
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
 
         label = Gtk.Label(label=_('gluster port:'), halign=Gtk.Align.END)
         label.show()
         grid.attach(label, 0, row, 1, 2)
-        smgrid = Gtk.Grid()
-        smgrid.set_column_homogeneous(False)
-        smgrid.set_row_homogeneous(True)
-        smgrid.show()
-        grid.attach(smgrid, 1, row, 2, 2)
 
         self.gluster_port1 = Gtk.ComboBoxText()
         self.gluster_port1.set_entry_text_column(0)
@@ -423,16 +429,16 @@ class MainWin(Gtk.Window):
         sel = 0
         self.gluster_port1.set_active(sel)
         self.gluster_port1.show()
-        smgrid.attach(self.gluster_port1, 0, 0, 1, 1)
+        grid.attach(self.gluster_port1, 1, row, 1, 1)
         self.gluster_port1.connect("changed", self.port_changed)
-        self.gluster_port1_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.END)
+        self.gluster_port1_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
         self.gluster_port1_label.show()
-        smgrid.attach(self.gluster_port1_label, 1, 0, 1, 1)
+        grid.attach(self.gluster_port1_label, 2, row, 1, 1)
 
         self.gluster_ip = Gtk.Entry()
         self.gluster_ip.set_text("192.168.99.1")
         self.gluster_ip.show()
-        grid.attach(self.gluster_ip, 2, row, 1, 2)
+        grid.attach(self.gluster_ip, 3, row, 1, 2)
         row += 1
 
         self.gluster_port2 = Gtk.ComboBoxText()
@@ -446,20 +452,20 @@ class MainWin(Gtk.Window):
             self.gluster_port2.set_active(0)
             sel = 0
         self.gluster_port2.show()
-        smgrid.attach(self.gluster_port2, 0, 1, 1, 1)
+        grid.attach(self.gluster_port2, 1, row, 1, 1)
         self.gluster_port2.connect("changed", self.port_changed)
-        self.gluster_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.END)
+        self.gluster_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
         self.gluster_port2_label.show()
-        smgrid.attach(self.gluster_port2_label, 1, 1, 1, 1)
+        grid.attach(self.gluster_port2_label, 2, row, 1, 1)
         row += 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
-        grid.attach(sep, 0, row, 3, 1)
+        grid.attach(sep, 0, row, 4, 1)
         row += 1
         hbox = Gtk.Box(spacing=10)
         hbox.show()
-        grid.attach(hbox, 0, row, 3, 1)
+        grid.attach(hbox, 0, row, 4, 1)
         row += 1
 
         but = Gtk.Button.new_with_label(_("OK"))
