@@ -34,7 +34,7 @@ timezone Asia/Shanghai --isUtc --nontp
 # Root password
 rootpw --iscrypted $6$RKC5W15k3K/cXBJf$4rEaKMZF/EtjIl0zZvjpGeZJjFlYpKzy76svDzH2DaDRE7XTADpiSvUMARYj0Zcsqay9RjI4UOFr7djw34XHR1
 # System services
-services --enabled="chronyd"
+services --disabled="chronyd" --enabled="ntpd"
 # User Information and password
 user --groups=wheel --name=lenovo --password=$6$dBtyehHvnQ6ss$VhiwJ1ISBLZvdnudHjvrglTCcvTkJovn8cNXS9G.BvolZBlBmUOqBrxqUvtpWVL2NRSCzKp8K1obYMgKgcMvD/ --iscrypted --gecos="Lenovo Administrator"
 # disable firewall and selinux
@@ -155,9 +155,6 @@ class Process_KS(threading.Thread):
 #        shutil.copytree("/mnt", isodir, symlinks=True)
 #        kscfg = isodir + "/interactive-defaults.ks"
 #        os.chmod(kscfg, 0o644)
-        print(self.win.ks_info["hostname"])
-        print(self.win.ks_info["ovirt"]["ip"])
-        print(self.win.ks_info["gluster"]["ip"])
         ks_text = ks_text.replace("$namezeus", self.win.ks_info["hostname"])
         ks_text = ks_text.replace("$ovirt_ip", self.win.ks_info["ovirt"]["ip"])
         ks_text = ks_text.replace("$gluster_ip", self.win.ks_info["gluster"]["ip"])
@@ -477,7 +474,7 @@ class MainWin(Gtk.Window):
         but.show()
         hbox.pack_start(but, True, True, 0)
 
-    def ok_clicked(self, widget):
+    def check_data(self):
         hostname = self.hentry.get_text()
         fqnre = re.compile('[a-z][_a-z0-9]{3,7}')
         res = fqnre.match(hostname)
@@ -485,35 +482,42 @@ class MainWin(Gtk.Window):
             echo = EchoInfo(self, _("Invalid Host Name"))
             echo.run()
             echo.destroy()
-            return
-        print(hostname)
+            return False
 
         disk1 = self.seldsk1.get_active_text()
         disk2 = self.seldsk2.get_active_text()
-        if disk1 == "None":
-            disk1 = ''
-        if disk2 == "None":
-            disk2 = ''
-        len1 = len(disk1)
-        len2 = len(disk2)
-        if len1 == 0 and len2 == 0:
-            echo = EchoInfo(self, _("Please select at lease one disk"))
+        if disk1 == 'None' and disk2 == 'None':
+            echo = EchoInfo(self, _("At lease one disk must be selected as root disk"))
             echo.run()
             echo.destroy()
-            return
-        elif len1 > 0 and len2 > 0:
-            echo = EchoInfo(self, _("Only one disk is supported now"))
+            return False
+        if disk1 == disk2:
+            echo = EchoInfo(self, _("Two disks for the rootfs cannot be the same"))
             echo.run()
             echo.destroy()
-            return
-        elif len1 > 0:
-            disk = disk1
-        elif len2 > 0:
-            disk = disk2
-        print(disk)
-
+            return False
+        if disk1 != 'None' and disk2 != 'None':
+            echo = EchoInfo(self, _("Disk mirror for rootfs is currently not supported"))
+            echo.run()
+            echo.destroy()
+            return False
+        
         ovirt_port1 = self.ovirt_port1.get_active_text()
         ovirt_port2 = self.ovirt_port2.get_active_text()
+        gluster_port1 = self.gluster_port1.get_active_text()
+        gluster_port2 = self.gluster_port2.get_active_text()
+        ports_used = [ovirt_port1, ovirt_port2, gluster_port1, gluster_port2]
+        ports_set = set(ports_used)
+        if ovirt_port1 == ovirt_port2 or gluster_port1 == gluster_port2:
+            echo = EchoInfo(self, _("Two NIC ports of one team cannot be the same"))
+            echo.run()
+            echo.destroy()
+            return False
+        if len(ports_used) > len(ports_set):
+            echo = EchoInfo(self, _("No NIC ports can be used twice"))
+            echo.run()
+            echo.destroy()
+            return False
         ovirt_ip = self.ovirt_ip.get_text()
         ipre = re.compile('([0-9]+\.){3}[0-9]+')
         match = ipre.match(ovirt_ip)
@@ -521,21 +525,34 @@ class MainWin(Gtk.Window):
             echo = EchoInfo(self, _("Invalid Ovirt Management IP"))
             echo.run()
             echo.destroy()
-            return
-        print(ovirt_port1, ovirt_port2)
-        print(ovirt_ip)
-
-        gluster_port1 = self.gluster_port1.get_active_text()
-        gluster_port2 = self.gluster_port2.get_active_text()
-        gluster_ip = self.gluster_ip.get_text()
+            return False
         match = ipre.match(gluster_ip)
         if not match or match.start() != 0 or match.end() != len(gluster_ip):
             echo = EchoInfo(self, _("Invalid Gluster IP"))
             echo.run()
             echo.destroy()
-            return
-        print(gluster_port1, gluster_port2)
-        print(gluster_ip)
+            return False
+        return True
+
+    def ok_clicked(self, widget):
+        if not self.check_data():
+            print("Check Failed")
+        hostname = self.hentry.get_text()
+
+        disk1 = self.seldsk1.get_active_text()
+        disk2 = self.seldsk2.get_active_text()
+        if disk1 != 'None':
+            disk = disk1
+        elif disk2 != 'None':
+            disk = disk2
+
+        ovirt_port1 = self.ovirt_port1.get_active_text()
+        ovirt_port2 = self.ovirt_port2.get_active_text()
+        ovirt_ip = self.ovirt_ip.get_text()
+
+        gluster_port1 = self.gluster_port1.get_active_text()
+        gluster_port2 = self.gluster_port2.get_active_text()
+        gluster_ip = self.gluster_ip.get_text()
         self.ks_info = {"hostname": hostname, "rootdisk": disk,
                 "ovirt": {"ip": ovirt_ip, "port1": ovirt_port1, "port2": ovirt_port2},
                 "gluster": {"ip": gluster_ip, "port1": gluster_port1, "port2": gluster_port2}
