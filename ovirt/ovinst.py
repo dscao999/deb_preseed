@@ -18,6 +18,53 @@ _ = gettext.gettext
 gettext.bindtextdomain("ovinst")
 gettext.textdomain('ovinst')
 
+def get_ostype():
+    ostype = 'Unknown'
+    with open('/etc/os-release', 'r') as os:
+        for line in os:
+            idx = line.find('ID=')
+            if idx != 0:
+                continue
+            line = line.rstrip('\n')
+            ostype = line[3:]
+            break
+    return ostype
+
+def xorriso(isotop, **kargs):
+    if not os.path.isdir(isotop):
+        return False
+    if not kargs["iso"]:
+        isoout = '/tmp/hybrid.iso'
+    else:
+        isoout = kargs["iso"]
+    if not kargs["label"]:
+        label = "ISO DSCAO"
+    else:
+        label = kargs["label"]
+
+    ostype = get_ostype()
+    if ostype == 'debian':
+        isolxbin = '/usr/lib/ISOLINUX/isolinux.bin'
+        efiimage = 'boot/grub/efi.img'
+        hdpfxbin = '/usr/lib/ISOLINUX/isohdpfx.bin'
+    elif ostype == 'fedora':
+        isolxbin = '/usr/share/syslinux/isolinux.bin'
+        efiimage = 'images/efiboot.img'
+        hdpfxbin = '/usr/share/syslinux/isohdpfx.bin'
+    else:
+        return False
+    isolinux_bin = isotop + '/isolinux/isolinux.bin'
+    os.chmod(isolinux_bin, 0o644)
+
+    cmd = 'xorriso -as mkisofs -r -volid "' + label + '"'
+    cmd += ' -isohybrid-mbr ' + hdpfxbin
+    cmd += ' -b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4'
+    cmd += ' -boot-info-table -no-emul-boot  -eltorito-alt-boot'
+    cmd += ' -e ' + efiimage + ' -no-emul-boot -isohybrid-gpt-basdat'
+    cmd += ' -o ' + isoout + ' ' + isotop
+    print(cmd)
+    return None
+
 ks_text = """#use command line install mode
 cmdline
 # accept license
@@ -151,8 +198,7 @@ class Process_KS(threading.Thread):
         ovirt_iso_path = '/run/initramfs/live/LiveOS/' + ovirt_iso
         with open(ovirt_iso_path, "rb") as isoh:
             isoh.seek(0x8028, 0)
-            label = isoh.read(32).decode('utf-8')
-        print(f'Label: {label}')
+            isolabel = isoh.read(32).decode('utf-8').rstrip()
         srcmnt = "/tmp/ovirt_src"
         os.mkdir(srcmnt, mode=0o755)
         res = subp.run("sudo mount -o ro "+ovirt_iso_path+" "+srcmnt,
@@ -178,6 +224,8 @@ class Process_KS(threading.Thread):
 
         with open(kscfg, "w") as ksfile:
             ksfile.write(ks_text)
+
+        res = xorriso(isodir, iso='/tmp/hybrid.iso', label=isolabel)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
