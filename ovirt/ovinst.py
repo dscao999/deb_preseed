@@ -8,6 +8,7 @@ import re
 import threading
 import subprocess as subp
 import time
+import shutil
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, Gdk
@@ -146,15 +147,26 @@ class Process_KS(threading.Thread):
 
     def run(self):
         global ks_text
-#        res = subp.run("sudo mount -o ro /run/initramfs/live/LiveOS/ovirt-inst.iso /mnt",
-#                shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
-#        if res.returncode != 0:
-#            GLib.idle_add(self.win.task_error, _("Mount Failed")+res.stdout)
-#            return
-#        isodir = os.mkdir("isotop-"+str(os.getpid()), mode=0o644)
-#        shutil.copytree("/mnt", isodir, symlinks=True)
-#        kscfg = isodir + "/interactive-defaults.ks"
-#        os.chmod(kscfg, 0o644)
+        ovirt_iso = 'ovirt-node-ng-installer-4.3.10-2020060117.el7.iso'
+        ovirt_iso_path = '/run/initramfs/live/LiveOS/' + ovirt_iso
+        with open(ovirt_iso_path, "rb") as isoh:
+            isoh.seek(0x8028, 0)
+            label = isoh.read(32).decode('utf-8')
+        print(f'Label: {label}')
+        srcmnt = "/tmp/ovirt_src"
+        os.mkdir(srcmnt, mode=0o755)
+        res = subp.run("sudo mount -o ro "+ovirt_iso_path+" "+srcmnt,
+                shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+        if res.returncode != 0:
+            GLib.idle_add(self.win.task_error, _("Operation Failed\n")+res.stdout)
+            return
+        isodir = "/tmp/isotop-"+str(os.getpid())
+        shutil.copytree(srcmnt, isodir, symlinks=True)
+        subp.run("sudo umount " + srcmnt, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+        os.rmdir(srcmnt)
+
+        kscfg = isodir + "/interactive-defaults.ks"
+        os.chmod(kscfg, 0o644)
         ks_text = ks_text.replace("$namezeus", self.win.ks_info["hostname"])
         ks_text = ks_text.replace("$ovirt_ip", self.win.ks_info["ovirt"]["ip"])
         ks_text = ks_text.replace("$gluster_ip", self.win.ks_info["gluster"]["ip"])
@@ -164,9 +176,8 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$gport1", self.win.ks_info["gluster"]["port1"])
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
 
-        with open("/tmp/custom.ks", "w") as ksfile:
+        with open(kscfg, "w") as ksfile:
             ksfile.write(ks_text)
-        time.sleep(5)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -526,6 +537,7 @@ class MainWin(Gtk.Window):
             echo.run()
             echo.destroy()
             return False
+        gluster_ip = self.gluster_ip.get_text()
         match = ipre.match(gluster_ip)
         if not match or match.start() != 0 or match.end() != len(gluster_ip):
             echo = EchoInfo(self, _("Invalid Gluster IP"))
