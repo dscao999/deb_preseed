@@ -102,8 +102,70 @@ blacklist {
 	property "ID_USB_INTERFACE_NUM"
 	property "ID_CDROM"
 }
+EOD
 
 systemctl disable iscsid.socket iscsid.service fcoe.service
+
+cat > /etc/ntp.conf <<EOD
+# For more information about this file, see the man pages
+# ntp.conf(5), ntp_acc(5), ntp_auth(5), ntp_clock(5), ntp_misc(5), ntp_mon(5).
+
+driftfile /var/lib/ntp/drift
+
+# Permit time synchronization with our time source, but do not
+# permit the source to query or modify the service on this system.
+restrict default kod nomodify notrap nopeer noquery
+restrict -6 default kod nomodify notrap nopeer noquery
+
+# Permit all access over the loopback interface.  This could
+# be tightened as well, but to do so would effect some of
+# the administrative functions.
+restrict 127.0.0.1
+restrict ::1
+
+# Hosts on local network are less restricted.
+#restrict 192.168.1.0 mask 255.255.255.0 nomodify notrap
+
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (http://www.pool.ntp.org/join.html).
+server cn.pool.ntp.org iburst
+
+#broadcast 192.168.1.255 autokey	# broadcast server
+#broadcastclient			# broadcast client
+#broadcast 224.0.1.1 autokey		# multicast server
+#multicastclient 224.0.1.1		# multicast client
+#manycastserver 239.255.254.254		# manycast server
+#manycastclient 239.255.254.254 autokey # manycast client
+
+# Enable public key cryptography.
+#crypto
+
+includefile /etc/ntp/crypto/pw
+
+# Key file containing the keys and key identifiers used when operating
+# with symmetric key cryptography.
+keys /etc/ntp/keys
+
+# Specify the key identifiers which are trusted.
+#trustedkey 4 8 42
+
+# Specify the key identifier to use with the ntpdc utility.
+#requestkey 8
+
+# Specify the key identifier to use with the ntpq utility.
+#controlkey 8
+
+# Enable writing of statistics records.
+#statistics clockstats cryptostats loopstats peerstats
+
+# Disable the monitoring facility to prevent amplification attacks using ntpdc
+# monlist command when default restrict does not include the noquery flag. See
+# CVE-2013-5211 for more details.
+# Note: Monitoring will not be disabled with the limited restriction flag.
+disable monitor
+#
+server  127.127.1.0 # local clock
+fudge   127.127.1.0 stratum 10
 EOD
 
 %end
@@ -222,8 +284,28 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$gport1", self.win.ks_info["gluster"]["port1"])
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
 
+        idx = 0
+        row = self.win.ntplist.get_row_at_index(idx)
+        ntpsvrs = []
+        while row:
+            label = row.get_children()[0]
+            svr = label.get_text()
+            ntpsvrs.append(svr)
+            idx += 1
+            row = self.win.ntplist.get_row_at_index(idx)
+
+        ks_lines = ks_text.split('\n')
+        nw_lines = []
+        for ksline in ks_lines:
+            if ksline.find('server cn.pool.ntp.org') == 0:
+                for svr in ntpsvrs:
+                    nw_lines.append('server ' + svr + ' iburst')
+            nw_lines.append(ksline)
+
+
         with open(kscfg, "w") as ksfile:
-            ksfile.write(ks_text)
+            for line in nw_lines:
+                ksfile.write(line+'\n')
 
         res = xorriso(isodir, iso='/tmp/hybrid.iso', label=isolabel)
 
@@ -325,6 +407,37 @@ def lsnet(rootwin):
     return nports
 
 class MainWin(Gtk.Window):
+    def ntpadd_clicked(self, button):
+        svr = self.ntpentry.get_text()
+        check = re.compile('([0-9]+\.){3}[0-9]+|([a-z][0-9a-z]*\.)*[a-z][0-9a-z]*')
+        match = check.match(svr)
+        if not match or match.start() != 0 or match.end() != len(svr):
+            echo = EchoInfo(self, _("Invalid NTP address"))
+            echo.run()
+            echo.destroy()
+            return
+        idx = 0
+        row = self.ntplist.get_row_at_index(idx)
+        while row:
+            label = row.get_children()[0]
+            if svr == label.get_text():
+                break
+            idx += 1
+            row = self.ntplist.get_row_at_index(idx)
+        if row:
+            return
+        if idx == 3:
+            echo = EchoInfo(self, _("Three Servers at Most!"))
+            echo.run()
+            echo.destroy()
+            return
+        row = Gtk.ListBoxRow()
+        label = Gtk.Label(label=svr)
+        label.show()
+        row.add(label)
+        row.show()
+        self.ntplist.add(row)
+
     def port_changed(self, combo):
         label = None
         port = combo.get_active_text()
@@ -366,7 +479,7 @@ class MainWin(Gtk.Window):
         sep.show()
         grid.attach(sep, 0, row, 4, 1)
         row += 1
-        sep = Gtk.Label(label=_("OS Root Disk"))
+        sep = Gtk.Label(label=_("\nOS Root Disk"))
         sep.show()
         grid.attach(sep, 0, row, 4, 1)
         row += 1
@@ -514,6 +627,32 @@ class MainWin(Gtk.Window):
         self.gluster_port2_label.show()
         grid.attach(self.gluster_port2_label, 2, row, 1, 1)
         row += 1
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep.show()
+        grid.attach(sep, 0, row, 4, 1)
+        row += 1
+        label = Gtk.Label(label=_("\nNTP Server Setup"))
+        label.show()
+        grid.attach(label, 0, row, 4, 1)
+        row += 1
+
+        label = Gtk.Label(label=_("NTP Server:"), halign=Gtk.Align.END)
+        label.show()
+        grid.attach(label, 0, row+1, 1, 1)
+        self.ntplist = Gtk.ListBox()
+        self.ntplist.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.ntplist.show()
+        grid.attach(self.ntplist, 1, row, 1, 3)
+        self.ntpentry = Gtk.Entry()
+        self.ntpentry.set_width_chars(16)
+        grid.attach(self.ntpentry, 3, row+1, 1, 1)
+        self.ntpentry.show()
+        but = Gtk.Button(label=_("<<Add"))
+        grid.attach(but, 2, row+1, 1, 1)
+        but.show()
+        but.connect("clicked", self.ntpadd_clicked)
+        row += 3
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
