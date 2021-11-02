@@ -50,7 +50,6 @@ function mkiso()
 	[ -z "$OUTISO" ] && OUTISO=-
 	#
 	chmod u+w ${ISODIR}/isolinux/isolinux.bin
-	cp /usr/lib/ISOLINUX/isolinux.bin $ISODIR/isolinux/isolinux.bin
 	xorriso -as mkisofs -r -volid "$LABEL" \
 		-o $OUTISO \
 		-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \

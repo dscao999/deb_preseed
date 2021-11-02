@@ -27,7 +27,7 @@ then
 	cval1="LIOS V2"
 	seds1="s/^${ckey1}=.*$/${ckey1}=\"${cval1}\"/"
 	ckey2="GRUB_CMDLINE_LINUX_DEFAULT"
-	cval2="quiet splash"
+	cval2="ipv6.disable=1 quiet splash"
 	seds2="s/^${ckey2}=.*$/${ckey2}=\"${cval2}\"/"
 	sed -i -e "$seds1" -e "$seds2" $TARGET/etc/default/grub
 	sed -i -e 's/^GRUB_TIMEOUT=.*$/GRUB_TIMEOUT=0/' $TARGET/etc/default/grub
