@@ -302,7 +302,6 @@ class Process_KS(threading.Thread):
                     nw_lines.append('server ' + svr + ' iburst')
             nw_lines.append(ksline)
 
-
         with open(kscfg, "w") as ksfile:
             for line in nw_lines:
                 ksfile.write(line+'\n')
@@ -406,6 +405,36 @@ def lsnet(rootwin):
             nports.append((nic, pname))
     return nports
 
+def lsusb_disk(rootwin):
+    usbdisks = ['None']
+    tpath = '/sys/block'
+    mnts = []
+    with open('/proc/mounts', 'r') as mounts:
+        for mnt in mounts:
+            if mnt.find('/dev/') != 0:
+                continue
+            mnts.append(mnt.split()[0])
+
+    with os.scandir(tpath) as direntries:
+        for lndev in direntries:
+            devnam = lndev.name
+            if not lndev.is_symlink():
+                continue
+            tname = os.readlink(tpath+'/'+devnam)
+            if tname.find('/usb') == -1:
+                continue
+            if iscdrom('/dev/'+devnam, rootwin):
+                continue
+            mntpoint = 0
+            for mnt in mnts:
+                if mnt.find(devnam) == -1:
+                    continue
+                mntpoint = 1
+                break
+            if mntpoint == 0:
+                usbdisks.append(devnam)
+    return usbdisks
+
 class MainWin(Gtk.Window):
     def ntpadd_clicked(self, button):
         svr = self.ntpentry.get_text()
@@ -468,11 +497,23 @@ class MainWin(Gtk.Window):
         label = Gtk.Label(label=_("  Host Name: "), halign=Gtk.Align.END)
         label.set_max_width_chars(20)
         label.show()
-        grid.attach(label, 1, 0, 1, 1)
+        grid.attach(label, 0, 0, 1, 1)
         self.hentry = Gtk.Entry()
         self.hentry.set_max_width_chars(12)
         self.hentry.show()
-        grid.attach(self.hentry, 2, 0, 1, 1)
+        grid.attach(self.hentry, 1, 0, 1, 1)
+        label = Gtk.Label(label=_("USB Media: "))
+        label.show()
+        grid.attach(label, 2, 0, 1, 1)
+        self.usbmedia = Gtk.ComboBoxText()
+        self.usbmedia.set_entry_text_column(0)
+        usbdisks = lsusb_disk(self)
+        for usbdsk in usbdisks:
+            self.usbmedia.append_text(usbdsk)
+        self.usbmedia.set_active(0)
+        grid.attach(self.usbmedia, 3, 0, 1, 1)
+        self.usbmedia.show()
+
         row = 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -737,6 +778,14 @@ class MainWin(Gtk.Window):
         if not self.check_data():
             print("Check Failed")
         hostname = self.hentry.get_text()
+        usbstick = self.usbmedia.get_active_text()
+        print(usbstick)
+        if usbstick == 'None':
+            echo = EchoInfo(self, _("A USB Storage must be specified"))
+            echo.run()
+            echo.destroy()
+            return
+        print(usbstick)
 
         disk1 = self.seldsk1.get_active_text()
         disk2 = self.seldsk2.get_active_text()
