@@ -306,7 +306,10 @@ class Process_KS(threading.Thread):
             for line in nw_lines:
                 ksfile.write(line+'\n')
 
-        res = xorriso(isodir, iso='/tmp/hybrid.iso', label=isolabel)
+        destiso = '/tmp/hybrid.iso'
+        if self.win.ks_info["usbdisk"]:
+            destiso = self.win.ks_info["usbdisk"]
+        res = xorriso(isodir, iso=destiso, label=isolabel)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -508,9 +511,11 @@ class MainWin(Gtk.Window):
         self.usbmedia = Gtk.ComboBoxText()
         self.usbmedia.set_entry_text_column(0)
         usbdisks = lsusb_disk(self)
+        idx = -1
         for usbdsk in usbdisks:
+            idx += 1
             self.usbmedia.append_text(usbdsk)
-        self.usbmedia.set_active(0)
+        self.usbmedia.set_active(idx)
         grid.attach(self.usbmedia, 3, 0, 1, 1)
         self.usbmedia.show()
 
@@ -779,10 +784,22 @@ class MainWin(Gtk.Window):
             print("Check Failed")
         hostname = self.hentry.get_text()
         usbstick = self.usbmedia.get_active_text()
-        print(usbstick)
         if usbstick == 'None':
-            echo = EchoInfo(self, _("A USB Storage must be specified"))
-            echo.run()
+            echo = Gtk.MessageDialog(transient_for=self,
+                    flags=0, message_type=Gtk.MessageType.WARNING,
+                    buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text=_("No USB Storage Selected"))
+            echo.format_secondary_text(_("Scan USB Again?"))
+            response = echo.run()
+            if response == Gtk.ResponseType.OK:
+                self.usbmedia.remove_all()
+                usbdisks = lsusb_disk(self)
+                idx = -1
+                for usbdsk in usbdisks:
+                    idx += 1
+                    self.usbmedia.append_text(usbdsk)
+                self.usbmedia.set_active(idx)
+                print(usbdisks)
             echo.destroy()
             return
         print(usbstick)
@@ -801,9 +818,11 @@ class MainWin(Gtk.Window):
         gluster_port1 = self.gluster_port1.get_active_text()
         gluster_port2 = self.gluster_port2.get_active_text()
         gluster_ip = self.gluster_ip.get_text()
+
         self.ks_info = {"hostname": hostname, "rootdisk": disk,
                 "ovirt": {"ip": ovirt_ip, "port1": ovirt_port1, "port2": ovirt_port2},
-                "gluster": {"ip": gluster_ip, "port1": gluster_port1, "port2": gluster_port2}
+                "gluster": {"ip": gluster_ip, "port1": gluster_port1, "port2": gluster_port2},
+                "usbdisk": usbstick
                 }
         self.set_sensitive(False)
         wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
