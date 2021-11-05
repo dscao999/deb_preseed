@@ -33,10 +33,6 @@ def get_ostype():
 def xorriso(isotop, **kargs):
     if not os.path.isdir(isotop):
         return False
-    if not kargs["iso"]:
-        isoout = '/tmp/hybrid.iso'
-    else:
-        isoout = kargs["iso"]
     if not kargs["label"]:
         label = "ISO DSCAO"
     else:
@@ -56,14 +52,28 @@ def xorriso(isotop, **kargs):
     isolinux_bin = isotop + '/isolinux/isolinux.bin'
     os.chmod(isolinux_bin, 0o644)
 
+    if kargs["iso"] != 'None':
+        isoout = '-'
+        isofile = '/dev/' + kargs["iso"]
+    else:
+        isoout = '/tmp/hybrid.iso'
+        try:
+            os.remove(isoout)
+        except:
+            return (10, "Cannot remove file: "+isoout)
+
     cmd = 'xorriso -as mkisofs -r -volid "' + label + '"'
     cmd += ' -isohybrid-mbr ' + hdpfxbin
     cmd += ' -b isolinux/isolinux.bin -c isolinux/boot.cat -boot-load-size 4'
     cmd += ' -boot-info-table -no-emul-boot  -eltorito-alt-boot'
     cmd += ' -e ' + efiimage + ' -no-emul-boot -isohybrid-gpt-basdat'
     cmd += ' -o ' + isoout + ' ' + isotop
+    if isoout == '-':
+        cmd += '| dd obs=128K oflag=direct conv=nocreat of=' + isofile
     print(cmd)
-    return None
+    res = subp.run(cmd, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+    print(res.stdout)
+    return (res.returncode, res.stdout)
 
 ks_text = """#use command line install mode
 cmdline
@@ -306,10 +316,8 @@ class Process_KS(threading.Thread):
             for line in nw_lines:
                 ksfile.write(line+'\n')
 
-        destiso = '/tmp/hybrid.iso'
-        if self.win.ks_info["usbdisk"]:
-            destiso = self.win.ks_info["usbdisk"]
-        res = xorriso(isodir, iso=destiso, label=isolabel)
+        destiso = self.win.ks_info["usbdisk"]
+        self.res = xorriso(isodir, iso=destiso, label=isolabel)
 
 class EchoInfo(Gtk.MessageDialog):
     def __init__(self, rootwin, info):
@@ -781,7 +789,7 @@ class MainWin(Gtk.Window):
 
     def ok_clicked(self, widget):
         if not self.check_data():
-            print("Check Failed")
+            return
         hostname = self.hentry.get_text()
         usbstick = self.usbmedia.get_active_text()
         if usbstick == 'None':
@@ -799,11 +807,11 @@ class MainWin(Gtk.Window):
                     idx += 1
                     self.usbmedia.append_text(usbdsk)
                 self.usbmedia.set_active(idx)
-                print(usbdisks)
+                echo.destroy()
+                return
             echo.destroy()
-            return
-        print(usbstick)
 
+        disk = 'None'
         disk1 = self.seldsk1.get_active_text()
         disk2 = self.seldsk2.get_active_text()
         if disk1 != 'None':
@@ -838,12 +846,16 @@ class MainWin(Gtk.Window):
             time.sleep(0.3)
             return True
         self.task.join()
-        self.task = None
-        self.get_window().set_cursor(self.cursor)
-        self.set_sensitive(True)
-        echo = EchoInfo(self, _("Task Ended"));
+        if self.task.res[0] == 0:
+            echo = EchoInfo(self, _("Task Ended"));
+        else:
+            echo = EchoInfo(self, _("Task Failed\n")+self.task.res[1])
         echo.run()
         echo.destroy()
+
+        self.get_window().set_cursor(self.cursor)
+        self.set_sensitive(True)
+        self.task = None
         Gtk.main_quit()
 
     def on_disk_changed(self, combo):
