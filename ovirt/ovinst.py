@@ -191,6 +191,7 @@ import os
 
 precmd = \"\"\"network --device=ovirt --activate --bootproto=static --ip=$ovirt_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$ovirt_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$ovirt_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
 network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gluster_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$gluster_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
+network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$public_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$public_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
 # ignore all other disks
 ignoredisk --only-use=$rootdisk
 # System bootloader configuration
@@ -220,6 +221,8 @@ ovirt_port1 = '$oport1'
 ovirt_port2 = '$oport2'
 gluster_port1 = '$gport1'
 gluster_port2 = '$gport2'
+public_port1 = '$pport1'
+public_port2 = '$pport2'
 
 def lsnet(nicpci):
     netdir = '/sys/class/net'
@@ -253,6 +256,10 @@ with open('/tmp/custom.ks', 'w') as ks:
     precmd = precmd.replace('$gluster_port1', nic)
     nic = lsnet(gluster_port2)
     precmd = precmd.replace('$gluster_port2', nic)
+    nic = lsnet(public_port1)
+    precmd = precmd.replace('$public_port1', nic)
+    nic = lsnet(public_port2)
+    precmd = precmd.replace('$public_port2', nic)
     ks.write(precmd)
 
 exit(0)
@@ -288,11 +295,14 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$namezeus", self.win.ks_info["hostname"])
         ks_text = ks_text.replace("$ovirt_ip", self.win.ks_info["ovirt"]["ip"])
         ks_text = ks_text.replace("$gluster_ip", self.win.ks_info["gluster"]["ip"])
+        ks_text = ks_text.replace("$public_ip", self.win.ks_info["public"]["ip"])
         ks_text = ks_text.replace("$rootpath", self.win.ks_info["rootdisk"])
         ks_text = ks_text.replace("$oport1", self.win.ks_info["ovirt"]["port1"])
         ks_text = ks_text.replace("$oport2", self.win.ks_info["ovirt"]["port2"])
         ks_text = ks_text.replace("$gport1", self.win.ks_info["gluster"]["port1"])
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
+        ks_text = ks_text.replace("$pport1", self.win.ks_info["public"]["port1"])
+        ks_text = ks_text.replace("$pport2", self.win.ks_info["public"]["port2"])
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
@@ -493,6 +503,10 @@ class MainWin(Gtk.Window):
             label = self.gluster_port1_label
         elif combo == self.gluster_port2:
             label = self.gluster_port2_label
+        elif combo == self.public_port1:
+            label = self.public_port1_label
+        elif combo == self.public_port2:
+            label = self.public_port2_label
         label.set_text(sport)
         
     def __init__(self):
@@ -615,14 +629,12 @@ class MainWin(Gtk.Window):
 
         self.ovirt_port2 = Gtk.ComboBoxText()
         self.ovirt_port2.set_entry_text_column(0)
+        sel += 1
         for port in self.nports:
             self.ovirt_port2.append_text(port[0])
-        if len(self.nports) > 1:
-            sel = 1
-            self.ovirt_port2.set_active(1)
-        else:
+        if len(self.nports) <= sel:
             sel = 0
-            self.ovirt_port2.set_active(0)
+        self.ovirt_port2.set_active(sel)
         grid.attach(self.ovirt_port2, 1, row, 1, 1)
         self.ovirt_port2.show()
         self.ovirt_port2.connect("changed", self.port_changed)
@@ -649,7 +661,9 @@ class MainWin(Gtk.Window):
         self.gluster_port1.set_entry_text_column(0)
         for port in self.nports:
             self.gluster_port1.append_text(port[0])
-        sel = 0
+        sel += 1
+        if len(self.nports) <= sel:
+            sel = 0
         self.gluster_port1.set_active(sel)
         self.gluster_port1.show()
         grid.attach(self.gluster_port1, 1, row, 1, 1)
@@ -666,20 +680,68 @@ class MainWin(Gtk.Window):
 
         self.gluster_port2 = Gtk.ComboBoxText()
         self.gluster_port2.set_entry_text_column(0)
+        sel += 1
         for port in self.nports:
             self.gluster_port2.append_text(port[0])
-        if len(self.nports) > 1:
-            self.gluster_port2.set_active(1)
-            sel = 1
-        else:
-            self.gluster_port2.set_active(0)
+        if len(self.nports) <= sel:
             sel = 0
+        self.gluster_port2.set_active(sel)
         self.gluster_port2.show()
         grid.attach(self.gluster_port2, 1, row, 1, 1)
         self.gluster_port2.connect("changed", self.port_changed)
         self.gluster_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
         self.gluster_port2_label.show()
         grid.attach(self.gluster_port2_label, 2, row, 1, 1)
+        row += 1
+
+        sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        sep.show()
+        grid.attach(sep, 0, row, 4, 1)
+        row += 1
+        sep = Gtk.Label(label=_("\nPublic/Display Network: "))
+        sep.show()
+        grid.attach(sep, 0, row, 4, 1)
+        row += 1
+
+        label = Gtk.Label(label=_('public port:'), halign=Gtk.Align.END)
+        label.show()
+        grid.attach(label, 0, row, 1, 2)
+
+        self.public_port1 = Gtk.ComboBoxText()
+        self.public_port1.set_entry_text_column(0)
+        for port in self.nports:
+            self.public_port1.append_text(port[0])
+        sel += 1
+        if sel >= len(self.nports):
+            sel = 0
+        self.public_port1.set_active(sel)
+        self.public_port1.show()
+        grid.attach(self.public_port1, 1, row, 1, 1)
+        self.public_port1.connect("changed", self.port_changed)
+        self.public_port1_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
+        self.public_port1_label.show()
+        grid.attach(self.public_port1_label, 2, row, 1, 1)
+
+        self.public_ip = Gtk.Entry()
+        self.public_ip.set_text("0.0.0.0")
+        self.public_ip.show()
+        grid.attach(self.public_ip, 3, row, 1, 2)
+        row += 1
+
+        self.public_port2 = Gtk.ComboBoxText()
+        self.public_port2.set_entry_text_column(0)
+        sel += 1
+        for port in self.nports:
+            self.public_port2.append_text(port[0])
+        if sel >= len(self.nports):
+            sel = 0
+        self.public_port2.set_active(sel)
+        self.public_port2.show()
+        grid.attach(self.public_port2, 1, row, 1, 1)
+        self.public_port2.connect("changed", self.port_changed)
+        self.public_port2_label = Gtk.Label(label=self.nports[sel][1], halign=Gtk.Align.START)
+        self.public_port2_label.show()
+        grid.attach(self.public_port2_label, 2, row, 1, 1)
         row += 1
 
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -785,6 +847,13 @@ class MainWin(Gtk.Window):
             echo.run()
             echo.destroy()
             return False
+        public_ip = self.public_ip.get_text()
+        match = ipre.match(public_ip)
+        if not match or match.start() != 0 or match.end() != len(public_ip):
+            echo = EchoInfo(self, _("Invalid Public IP"))
+            echo.run()
+            echo.destroy()
+            return False
         return True
 
     def ok_clicked(self, widget):
@@ -827,9 +896,14 @@ class MainWin(Gtk.Window):
         gluster_port2 = self.gluster_port2.get_active_text()
         gluster_ip = self.gluster_ip.get_text()
 
+        public_port1 = self.public_port1.get_active_text()
+        public_port2 = self.public_port2.get_active_text()
+        public_ip = self.public_ip.get_text()
+
         self.ks_info = {"hostname": hostname, "rootdisk": disk,
                 "ovirt": {"ip": ovirt_ip, "port1": ovirt_port1, "port2": ovirt_port2},
                 "gluster": {"ip": gluster_ip, "port1": gluster_port1, "port2": gluster_port2},
+                "public": {"ip": public_ip, "port1": public_port1, "port2": public_port2},
                 "usbdisk": usbstick
                 }
         self.set_sensitive(False)
