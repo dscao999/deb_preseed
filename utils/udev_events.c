@@ -119,7 +119,7 @@ static void send_info(const char *pipe)
 exit_10:
 	close(fd);
 #ifdef NDEBUG
-	closenlog();
+	closelog();
 #endif
 }
 
