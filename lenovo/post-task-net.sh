@@ -264,6 +264,9 @@ ENDDOC
 chown $auto_user:$auto_user /home/$auto_user/.i18n
 #
 cat >> /home/$auto_user/.xsessionrc <<"ENDDOC"
+if [ -x /usr/bin/hevent ]; then
+	hevent &
+fi
 ##
 ## set variable LANG from .i18n, automatically generated
 ## do not edit
@@ -357,7 +360,7 @@ fi
 if dpkg --list jpeg-player > /dev/null 2>&1; then
 	rm -f /etc/xdg/autostart/jpeg-player.desktop
 	if ! fgrep jpeg-player /home/$auto_user/.xsessionrc > /dev/null 2>&1; then
-		sed -i -e '$a/usr/bin/jpeg-player -m 1 &' /home/$auto_user/.xsessionrc
+		sed -i -e '/ulimit/a/usr/bin/jpeg-player -m 1 &' /home/$auto_user/.xsessionrc
 	fi
 fi
 #

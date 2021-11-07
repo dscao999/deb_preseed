@@ -123,7 +123,7 @@ exit_10:
 #endif
 }
 
-static void xset_keyboard(void)
+static void xset_keyboard(int delay)
 {
 	pid_t child;
 	int sysret;
@@ -132,7 +132,9 @@ static void xset_keyboard(void)
 	if (child == -1)
 		fprintf(stderr, "Cannot fork: %s\n", strerror(errno));
 	else if (child == 0) {
-		static const struct timespec itv = {.tv_sec = 0, .tv_nsec = 200000000};
+		struct timespec itv;
+		itv.tv_sec = 0;
+		itv.tv_nsec = (delay * 1000000ul);
 		nanosleep(&itv, NULL);
 		sysret = execl("/usr/bin/setxkbmap", "setxkbmap", "-option",
 				"srvrkeys:none", NULL);
@@ -142,7 +144,7 @@ static void xset_keyboard(void)
 	}
 }
 
-static int recv_info(const char *pipe)
+static int recv_info(const char *pipe, int delay)
 {
 	struct pollfd pfd;
 	int fd, retv, sysret, peer_exit;
@@ -191,7 +193,7 @@ static int recv_info(const char *pipe)
 			buf[sysret] = 0;
 			slash =strrchr(buf, '/');
 			if (slash && strstr(slash+1, "event"))
-				xset_keyboard();
+				xset_keyboard(delay);
 		} while (!peer_exit && global_exit == 0);
 		close(fd);
 	} while (global_exit == 0);
@@ -204,9 +206,10 @@ int main(int argc, char *argv[])
 	const char *pipe = NULL;
 	extern char *optarg;
 	extern int optind, opterr, optopt;
-	int lidx, opt;
+	int lidx, opt, delay;
 	static const struct option lopt[] = {
 		{"pipe", 1, NULL, 'p'},
+		{"delay", 1, NULL, 'd'},
 		{"send", 0, NULL, 's'},
 		{"recv", 0, NULL, 'r'},
 		{}
@@ -217,8 +220,9 @@ int main(int argc, char *argv[])
 	opterr = 0;
 	sndrcv = 0;
 	fin = 0;
+	delay = 150;
 	do {
-		opt = getopt_long(argc, argv, ":srp:", lopt, &lidx);
+		opt = getopt_long(argc, argv, ":srp:d:", lopt, &lidx);
 		switch(opt) {
 		case -1:
 			fin = 1;
@@ -231,6 +235,19 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			pipe = optarg;
+			break;
+		case 'd':
+			delay = atoi(optarg);
+			if (delay < 0) {
+				delay = 150;
+				fprintf(stderr, "Invalid delay %d, set to " \
+						"150 milliseconds\n", delay);
+			}
+			if (delay > 1000) {
+				delay = delay % 1000;
+				fprintf(stderr, "More than one second, " \
+						"truncated to %d\n", delay);
+			}
 			break;
 		case '?':
 			fprintf(stderr, "Unknown option: %c\n", optopt);
@@ -256,16 +273,16 @@ int main(int argc, char *argv[])
 		sact.sa_mask = mset;
 		sact.sa_flags = 0;
 		if (sigaction(SIGINT, &sact, NULL) == -1)
-			fprintf(stderr, "signal install failed: %s\n",
-					strerror(errno));
+			fprintf(stderr, "signal install failed for SIGINT: " \
+					"%s\n", strerror(errno));
 		if (sigaction(SIGTERM, &sact, NULL) == -1)
-			fprintf(stderr, "signal install failed: %s\n",
-					strerror(errno));
+			fprintf(stderr, "signal install failed for SIGTERM: " \
+					"%s\n", strerror(errno));
 		sact.sa_flags = SA_NOCLDWAIT;
 		if (sigaction(SIGCHLD, &sact, NULL) == -1)
 			fprintf(stderr, "signal install failed for SIGCHLD: " \
 					"%s\n", strerror(errno));
-		retv = recv_info(pipe);
+		retv = recv_info(pipe, delay);
 		unlink(pipe);
 	}
 	return retv;
