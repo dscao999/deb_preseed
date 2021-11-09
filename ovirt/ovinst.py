@@ -58,7 +58,8 @@ def xorriso(isotop, **kargs):
     else:
         isoout = '/tmp/hybrid.iso'
         try:
-            os.remove(isoout)
+            if os.path.isfile(isoout):
+                os.remove(isoout)
         except:
             return (10, "Cannot remove file: "+isoout)
 
@@ -76,7 +77,7 @@ def xorriso(isotop, **kargs):
     return (res.returncode, res.stdout)
 
 ks_text = """#use command line install mode
-cmdline
+graphical
 # accept license
 eula --agreed
 # System authorization information
@@ -193,6 +194,7 @@ precmd = \"\"\"network --device=ovirt --activate --bootproto=static --ip=$ovirt_
 network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gluster_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$gluster_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
 network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$public_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$public_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
 # ignore all other disks
+zerombr
 ignoredisk --only-use=$rootdisk
 # System bootloader configuration
 bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=$rootdisk
