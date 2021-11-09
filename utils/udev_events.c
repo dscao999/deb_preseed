@@ -34,7 +34,7 @@ static inline void logerr(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsyslog(LOG_INFO, fmt, ap);
+	vsyslog(LOG_ERR, fmt, ap);
 	va_end(ap);
 }
 #else
@@ -95,28 +95,36 @@ static void send_info(const char *pipe)
 {
 	const char *keyboard, *devpath;
 	int fd, sysret;
+	struct stat pst;
 
-#ifdef NDEBUG
-	openlog("Set Keyboard", 0, 0);
-#endif
 	keyboard = getenv("ID_INPUT_KEYBOARD");
 	if (keyboard == NULL || keyboard[0] != '1')
 		return;
-	fd = open(pipe, O_WRONLY|O_NONBLOCK);
-	if (fd == -1) {
-		if (errno != ENOENT)
-			logerr("Cannot open pipe '%s'", pipe);
-		return;
-	}
+#ifdef NDEBUG
+	openlog(NULL, 0, 0);
+#endif
 	devpath = getenv("DEVPATH");
 	if (devpath == NULL) {
 		logerr("ID_INPUT_KEYBOARD without DEVPATH");
-		goto exit_10;
+		return;
+	}
+
+	sysret = stat(pipe, &pst);
+	if (sysret == -1) {
+		if (errno != ENOENT)
+			logerr("Cannot stat pipe '%s': %s", pipe,
+					strerror(errno));
+		return;
+	}
+	fd = open(pipe, O_WRONLY);
+	if (fd == -1) {
+		logerr("Cannot open pipe '%s'", pipe);
+		return;
 	}
 	sysret = write(fd, devpath, strlen(devpath));
 	if (sysret == -1)
 		logerr("Write to '%s' failed", pipe);
-exit_10:
+
 	close(fd);
 #ifdef NDEBUG
 	closelog();
@@ -153,12 +161,15 @@ static int recv_info(const char *pipe, int delay)
 
 	do {
 		retv = 0;
-		fd = open(pipe, O_RDONLY|O_NONBLOCK);
-		if (fd == -1) {
-			fprintf(stderr, "Cannot open '%s' for reading: %s\n",
-					pipe, strerror(errno));
-			return 2;
-		}
+		do {
+			fd = open(pipe, O_RDONLY);
+			if (fd == -1 && errno != EINTR) {
+				fprintf(stderr, "Cannot open '%s' for " \
+						"reading: %s\n", pipe,
+						strerror(errno));
+				return 2;
+			}
+		} while (fd == -1 && global_exit == 0);
 		pfd.fd = fd;
 		pfd.events = POLLIN;
 		peer_exit = 0;
