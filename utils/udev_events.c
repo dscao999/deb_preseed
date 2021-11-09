@@ -19,6 +19,7 @@
 
 static volatile int global_exit = 0;
 static volatile int child_exit = 0;
+static int verbose = 0;
 
 static void sighand(int sig)
 {
@@ -124,6 +125,8 @@ static void send_info(const char *pipe)
 	sysret = write(fd, devpath, strlen(devpath));
 	if (sysret == -1)
 		logerr("Write to '%s' failed", pipe);
+	else if (verbose == 1)
+		logerr("Send %d bytes to %s\n", sysret, pipe);
 
 	close(fd);
 #ifdef NDEBUG
@@ -144,6 +147,12 @@ static void xset_keyboard(int delay)
 		itv.tv_sec = 0;
 		itv.tv_nsec = (delay * 1000000ul);
 		nanosleep(&itv, NULL);
+		if (verbose == 1) {
+			clock_gettime(CLOCK_MONOTONIC_COARSE, &itv);
+			fprintf(stderr, "[%6ld.%06ld] execute setxkbmap " \
+					"-option srvrkeys:none\n",
+					itv.tv_sec, (itv.tv_nsec)/1000);
+		}
 		sysret = execl("/usr/bin/setxkbmap", "setxkbmap", "-option",
 				"srvrkeys:none", NULL);
 		if (sysret == -1)
@@ -223,6 +232,7 @@ int main(int argc, char *argv[])
 		{"delay", 1, NULL, 'd'},
 		{"send", 0, NULL, 's'},
 		{"recv", 0, NULL, 'r'},
+		{"verbose", 0, NULL, 'v'},
 		{}
 	};
 	struct sigaction sact;
@@ -233,7 +243,7 @@ int main(int argc, char *argv[])
 	fin = 0;
 	delay = 150;
 	do {
-		opt = getopt_long(argc, argv, ":srp:d:", lopt, &lidx);
+		opt = getopt_long(argc, argv, ":srvp:d:", lopt, &lidx);
 		switch(opt) {
 		case -1:
 			fin = 1;
@@ -259,6 +269,9 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "More than one second, " \
 						"truncated to %d\n", delay);
 			}
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		case '?':
 			fprintf(stderr, "Unknown option: %c\n", optopt);
