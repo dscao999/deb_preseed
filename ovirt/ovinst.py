@@ -115,7 +115,7 @@ blacklist {
 }
 EOD
 
-sed -i -f /tmp/ntp-sed.cmd /etc/ntp.conf
+sed -i $sedcmd /etc/ntp.conf
 
 %end
 
@@ -164,8 +164,6 @@ gluster_port2 = '$gport2'
 public_port1 = '$pport1'
 public_port2 = '$pport2'
 
-ntp_servers = $ntp_servers
-
 def lsnet(nicpci):
     netdir = '/sys/class/net'
     ports = os.listdir(netdir)
@@ -203,17 +201,6 @@ with open('/tmp/custom.ks', 'w') as ks:
     nic = lsnet(public_port2)
     precmd = precmd.replace('$public_port2', nic)
     ks.write(precmd)
-
-with open('/tmp/ntp-sed.cmd', 'w') as sed:
-    if len(ntp_servers) > 0:
-        sed.write('/^server 3/a')
-    for ntpsvr in ntp_servers:
-        sed.write('server ' + ntpsvr + ' iburst\\\\n')
-    svrdel = ''
-    if len(ntp_servers) > 0:
-        svrdel = '\\n'
-    sed.write(svrdel + '/^server [0-9]/d\\n')
-    sed.write('$aserver 127.127.1.0\\\\nfudge 127.127.1.0 stratum 10\\\\n')
 
 exit(0)
 %end
@@ -259,17 +246,18 @@ class Process_KS(threading.Thread):
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
-        ntpsvrs = '['
+        sedcmd = '-e \'/^server [0-9]/d\' '
+        ntpsvrs = ''
         while row:
             label = row.get_children()[0]
             svr = label.get_text()
-            ntpsvrs += "'" + svr + '\','
+            ntpsvrs += 'server ' + svr + ' iburst\\n'
             idx += 1
             row = self.win.ntplist.get_row_at_index(idx)
         if idx > 0:
-            ntpsvrs = ntpsvrs[:-1]
-        ntpsvrs += ']'
-        ks_text = ks_text.replace("$ntp_servers", ntpsvrs);
+            sedcmd += '-e \'/^server 3/a' + ntpsvrs + '\' '
+        sedcmd += '-e \'$aserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10\\n\''
+        ks_text = ks_text.replace("$sedcmd", sedcmd);
 
         with open(kscfg, "w") as ksfile:
             ksfile.write(ks_text)
