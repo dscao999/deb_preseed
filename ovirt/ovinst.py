@@ -115,69 +115,7 @@ blacklist {
 }
 EOD
 
-systemctl disable iscsid.socket iscsid.service fcoe.service
-
-cat > /etc/ntp.conf <<EOD
-# For more information about this file, see the man pages
-# ntp.conf(5), ntp_acc(5), ntp_auth(5), ntp_clock(5), ntp_misc(5), ntp_mon(5).
-
-driftfile /var/lib/ntp/drift
-
-# Permit time synchronization with our time source, but do not
-# permit the source to query or modify the service on this system.
-restrict default kod nomodify notrap nopeer noquery
-restrict -6 default kod nomodify notrap nopeer noquery
-
-# Permit all access over the loopback interface.  This could
-# be tightened as well, but to do so would effect some of
-# the administrative functions.
-restrict 127.0.0.1
-restrict ::1
-
-# Hosts on local network are less restricted.
-#restrict 192.168.1.0 mask 255.255.255.0 nomodify notrap
-
-# Use public servers from the pool.ntp.org project.
-# Please consider joining the pool (http://www.pool.ntp.org/join.html).
-server cn.pool.ntp.org iburst
-
-#broadcast 192.168.1.255 autokey	# broadcast server
-#broadcastclient			# broadcast client
-#broadcast 224.0.1.1 autokey		# multicast server
-#multicastclient 224.0.1.1		# multicast client
-#manycastserver 239.255.254.254		# manycast server
-#manycastclient 239.255.254.254 autokey # manycast client
-
-# Enable public key cryptography.
-#crypto
-
-includefile /etc/ntp/crypto/pw
-
-# Key file containing the keys and key identifiers used when operating
-# with symmetric key cryptography.
-keys /etc/ntp/keys
-
-# Specify the key identifiers which are trusted.
-#trustedkey 4 8 42
-
-# Specify the key identifier to use with the ntpdc utility.
-#requestkey 8
-
-# Specify the key identifier to use with the ntpq utility.
-#controlkey 8
-
-# Enable writing of statistics records.
-#statistics clockstats cryptostats loopstats peerstats
-
-# Disable the monitoring facility to prevent amplification attacks using ntpdc
-# monlist command when default restrict does not include the noquery flag. See
-# CVE-2013-5211 for more details.
-# Note: Monitoring will not be disabled with the limited restriction flag.
-disable monitor
-#
-server  127.127.1.0 # local clock
-fudge   127.127.1.0 stratum 10
-EOD
+sed -i -f /tmp/ntp-sed.cmd /etc/ntp.conf
 
 %end
 
@@ -226,6 +164,8 @@ gluster_port2 = '$gport2'
 public_port1 = '$pport1'
 public_port2 = '$pport2'
 
+ntp_servers = $ntp_servers
+
 def lsnet(nicpci):
     netdir = '/sys/class/net'
     ports = os.listdir(netdir)
@@ -263,6 +203,13 @@ with open('/tmp/custom.ks', 'w') as ks:
     nic = lsnet(public_port2)
     precmd = precmd.replace('$public_port2', nic)
     ks.write(precmd)
+
+with open('/tmp/ntp-sed.cmd', 'w') as sed:
+    sed.write('/^server 3/a')
+    for ntpsvr in ntp_servers:
+        sed.write('server ' + ntpsvr + ' iburst\\n')
+    sed.write('\n/^server [0-9]/d\n')
+    sed.write('$aserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10\\n')
 
 exit(0)
 %end
@@ -308,25 +255,18 @@ class Process_KS(threading.Thread):
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
-        ntpsvrs = []
+        ntpsvrs = '['
         while row:
             label = row.get_children()[0]
             svr = label.get_text()
-            ntpsvrs.append(svr)
+            ntpsvrs += svr + ','
             idx += 1
             row = self.win.ntplist.get_row_at_index(idx)
-
-        ks_lines = ks_text.split('\n')
-        nw_lines = []
-        for ksline in ks_lines:
-            if ksline.find('server cn.pool.ntp.org') == 0:
-                for svr in ntpsvrs:
-                    nw_lines.append('server ' + svr + ' iburst')
-            nw_lines.append(ksline)
+        ntpsvrs = ntpsvrs[:-1] + ']'
+        ks_text = ks_text.replace("$ntp_servers", ntpsvrs);
 
         with open(kscfg, "w") as ksfile:
-            for line in nw_lines:
-                ksfile.write(line+'\n')
+            ksfile.write(ks_text)
 
         destiso = self.win.ks_info["usbdisk"]
         self.res = xorriso(isodir, iso=destiso, label=isolabel)

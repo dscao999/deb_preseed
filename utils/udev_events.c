@@ -75,8 +75,9 @@ exit_10:
 static void send_info(const char *pipe)
 {
 	const char *keyboard, *devpath;
-	int fd, sysret;
+	int fd, sysret, cnt;
 	struct stat pst;
+	static const struct timespec itv = {.tv_sec = 0, .tv_nsec = 40000000};
 
 	keyboard = getenv("ID_INPUT_KEYBOARD");
 	if (keyboard == NULL || keyboard[0] != '1')
@@ -93,7 +94,13 @@ static void send_info(const char *pipe)
 					strerror(errno));
 		return;
 	}
-	fd = open(pipe, O_WRONLY);
+	cnt = 0;
+	fd = open(pipe, O_WRONLY|O_NONBLOCK);
+	while (fd == -1 && cnt < 5) {
+		nanosleep(&itv, 0);
+		fd = open(pipe, O_WRONLY|O_NONBLOCK);
+		cnt += 1;
+	}
 	if (fd == -1) {
 		logerr("Cannot open pipe '%s'", pipe);
 		return;
@@ -108,19 +115,17 @@ static void send_info(const char *pipe)
 	closelog();
 }
 
-static void xset_keyboard(int delay)
+static void execute_set()
 {
-	pid_t child;
+	pid_t subpid;
+	struct timespec itv;
 	int sysret;
 
-	child = fork();
-	if (child == -1)
-		prterr("Cannot fork: %s\n", strerror(errno));
-	else if (child == 0) {
-		struct timespec itv;
-		itv.tv_sec = 0;
-		itv.tv_nsec = (delay * 1000000ul);
-		nanosleep(&itv, NULL);
+	subpid = fork();
+	if (subpid == -1) {
+		prterr("agent fork failed: %s\n", strerror(errno));
+		return;
+	} else if (subpid == 0) {
 		if (verbose == 1) {
 			clock_gettime(CLOCK_MONOTONIC_COARSE, &itv);
 			prterr("[%6ld.%06ld] execute setxkbmap -option " \
@@ -129,9 +134,33 @@ static void xset_keyboard(int delay)
 		}
 		sysret = execl("/usr/bin/setxkbmap", "setxkbmap", "-option",
 				"srvrkeys:none", NULL);
-		if (sysret == -1)
+		if (sysret == -1) {
 			prterr("execl failed: %s\n", strerror(errno));
-		exit(1);
+			exit(1);
+		}
+	}
+}
+
+static void xset_keyboard(int delay)
+{
+	pid_t child;
+	int sysret;
+	struct timespec itv, rem;
+	itv.tv_sec = 0;
+	itv.tv_nsec = (delay * 1000000ul);
+
+	printf("tv_nsec: %ld\n", itv.tv_nsec);
+	child = fork();
+	if (child == -1)
+		prterr("Cannot fork: %s\n", strerror(errno));
+	else if (child == 0) {
+		execute_set();
+		do {
+			sysret = nanosleep(&itv, &rem);
+			itv = rem;
+		} while (sysret == -1 && errno == EINTR);
+		execute_set();
+		exit(0);
 	}
 }
 
@@ -211,11 +240,12 @@ int main(int argc, char *argv[])
 	};
 	struct sigaction sact;
 	sigset_t mset;
+	struct timespec itv;
 
 	opterr = 0;
 	sndrcv = 0;
 	fin = 0;
-	delay = 150;
+	delay = 300;
 	do {
 		opt = getopt_long(argc, argv, ":srvp:d:", lopt, &lidx);
 		switch(opt) {
@@ -234,12 +264,12 @@ int main(int argc, char *argv[])
 		case 'd':
 			delay = atoi(optarg);
 			if (delay < 0) {
-				delay = 150;
+				delay = 300;
 				prterr("Invalid delay %d, set to " \
 						"150 milliseconds\n", delay);
 			}
 			if (delay > 1000) {
-				delay = delay % 1000;
+				delay = 300;
 				prterr("More than one second, " \
 						"truncated to %d\n", delay);
 			}
@@ -280,6 +310,9 @@ int main(int argc, char *argv[])
 		if (sigaction(SIGCHLD, &sact, NULL) == -1)
 			prterr("signal install failed for SIGCHLD: " \
 					"%s\n", strerror(errno));
+		clock_gettime(CLOCK_MONOTONIC_COARSE, &itv);
+		printf("[%6ld.%06ld] %s: Ready for keyboard events.\n",
+				itv.tv_sec, itv.tv_nsec / 1000, argv[0]);
 		retv = recv_info(pipe, delay);
 		unlink(pipe);
 	}
