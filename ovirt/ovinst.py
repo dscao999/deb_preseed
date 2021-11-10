@@ -205,11 +205,15 @@ with open('/tmp/custom.ks', 'w') as ks:
     ks.write(precmd)
 
 with open('/tmp/ntp-sed.cmd', 'w') as sed:
-    sed.write('/^server 3/a')
+    if len(ntp_servers) > 0:
+        sed.write('/^server 3/a')
     for ntpsvr in ntp_servers:
-        sed.write('server ' + ntpsvr + ' iburst\\n')
-    sed.write('\n/^server [0-9]/d\n')
-    sed.write('$aserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10\\n')
+        sed.write('server ' + ntpsvr + ' iburst\\\\n')
+    svrdel = ''
+    if len(ntp_servers) > 0:
+        svrdel = '\\n'
+    sed.write(svrdel + '/^server [0-9]/d\\n')
+    sed.write('$aserver 127.127.1.0\\\\nfudge 127.127.1.0 stratum 10\\\\n')
 
 exit(0)
 %end
@@ -259,10 +263,12 @@ class Process_KS(threading.Thread):
         while row:
             label = row.get_children()[0]
             svr = label.get_text()
-            ntpsvrs += svr + ','
+            ntpsvrs += "'" + svr + '\','
             idx += 1
             row = self.win.ntplist.get_row_at_index(idx)
-        ntpsvrs = ntpsvrs[:-1] + ']'
+        if idx > 0:
+            ntpsvrs = ntpsvrs[:-1]
+        ntpsvrs += ']'
         ks_text = ks_text.replace("$ntp_servers", ntpsvrs);
 
         with open(kscfg, "w") as ksfile:
