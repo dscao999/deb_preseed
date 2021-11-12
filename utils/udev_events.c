@@ -149,7 +149,6 @@ static void xset_keyboard(int delay)
 	itv.tv_sec = 0;
 	itv.tv_nsec = (delay * 1000000ul);
 
-	printf("tv_nsec: %ld\n", itv.tv_nsec);
 	child = fork();
 	if (child == -1)
 		prterr("Cannot fork: %s\n", strerror(errno));
@@ -181,6 +180,9 @@ static int recv_info(const char *pipe, int delay)
 						strerror(errno));
 				return 2;
 			}
+			if (verbose != 0 && fd == -1)
+				prterr("open operation failed: %s\n",
+						strerror(errno));
 		} while (fd == -1 && global_exit == 0);
 		pfd.fd = fd;
 		pfd.events = POLLIN;
