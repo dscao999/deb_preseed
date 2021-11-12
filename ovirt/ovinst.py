@@ -78,6 +78,7 @@ def xorriso(isotop, **kargs):
 
 ks_text = """#use command line install mode
 graphical
+#vnc --port=8001
 # accept license
 eula --agreed
 # System authorization information
@@ -102,7 +103,28 @@ selinux --disabled
 # Network information
 network --hostname=$namezeus
 
-%include /tmp/custom.ks
+network --device=ovirt --activate --bootproto=static --ip=$ovirt_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$oport1'{\\"prio\\":-10, \\"sticky\\": true}',$oport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
+network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gport1'{\\"prio\\":-10, \\"sticky\\": true}',$gport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
+network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$pport1'{\\"prio\\":-10, \\"sticky\\": true}',$pport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
+# ignore all other disks
+zerombr
+ignoredisk --only-use=$rootdisk
+# System bootloader configuration
+bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=$rootdisk
+# Partition clearing information
+clearpart --all --initlabel --drives=$rootdisk
+# Disk partitioning information
+part /boot/efi --fstype="efi" --ondisk=$rootdisk --size=256 --label="SYS_EFISP"
+part /boot --fstype="ext2" --ondisk=$rootdisk --size=2048 --label="SYS_BOOTFS"
+#
+part pv.407 --fstype="lvmpv" --ondisk=$rootdisk --size=70000 --grow
+volgroup onn_$namezeus --pesize=4096 pv.407
+logvol none  --fstype="None" --size=60000 --thinpool --metadatasize=4096 --chunksize=65536 --name=pool00 --vgname=onn_$namezeus
+#
+logvol swap  --fstype="swap" --size=4096  --label="SYS_SWAP" --name=swap --vgname=onn_$namezeus
+logvol /     --fstype="xfs" --size=10240  --label="SYS_ROOTFS" --thin --poolname=pool00 --name=root --vgname=onn_$namezeus
+logvol /var  --fstype="xfs" --size=10240  --label="SYS_VARFS"  --thin --poolname=pool00 --name=var  --vgname=onn_$namezeus
+logvol /home  --fstype="xfs" --size=4096 --label="USER_HOMEFS" --thin --poolname=pool00 --name=home --vgname=onn_$namezeus
 
 %post --erroronfail
 imgbase layout --init
@@ -113,8 +135,13 @@ blacklist {
 	property "ID_USB_INTERFACE_NUM"
 	property "ID_CDROM"
 }
+
+blacklist {
+    devnode "$rootdisk"
+}
 EOD
 
+sed -i -e '$a127.0.1.1\\t$namezeus\\n' /etc/hosts
 sed -i $sedcmd /etc/ntp.conf
 
 %end
@@ -124,47 +151,9 @@ pwpolicy root --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 pwpolicy user --minlen=6 --minquality=1 --notstrict --nochanges --emptyok
 pwpolicy luks --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 %end
+"""
 
-%pre --interpreter=/usr/bin/python
-import os
-
-precmd = \"\"\"network --device=ovirt --activate --bootproto=static --ip=$ovirt_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$ovirt_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$ovirt_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
-network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gluster_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$gluster_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
-network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$public_port1'{\\\\"prio\\\\":-10, \\\\"sticky\\\\": true}',$public_port2'{\\\\"prio\\\\":100}'" --teamconfig="{\\\\"runner\\\\": {\\\\"name\\\\": \\\\"activebackup\\\\"}}"
-# ignore all other disks
-zerombr
-ignoredisk --only-use=$rootdisk
-# System bootloader configuration
-bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=$rootdisk
-# Partition clearing information
-clearpart --all --initlabel --drives=$rootdisk
-# Disk partitioning information
-part /boot/efi --fstype="efi" --ondisk=$rootdisk --size=200 --label="EFI_SP"
-part /boot --fstype="ext2" --ondisk=$rootdisk --size=1024 --label="BOOTFS"
-#
-part pv.407 --fstype="lvmpv" --ondisk=$rootdisk --size=70000 --grow
-volgroup onn_$namezeus --pesize=4096 pv.407
-logvol none  --fstype="None" --size=60000 --thinpool --metadatasize=4096 --chunksize=65536 --name=pool00 --vgname=onn_$namezeus
-#
-logvol swap  --fstype="swap" --size=1024  --label="SWAP" --name=swap --vgname=onn_$namezeus
-logvol /     --fstype="xfs" --size=10240  --label="ROOTFS" --thin --poolname=pool00 --name=root --vgname=onn_$namezeus
-logvol /var  --fstype="xfs" --size=10240  --label="VARFS"  --thin --poolname=pool00 --name=var  --vgname=onn_$namezeus
-logvol /home  --fstype="xfs" --size=1024 --label="HOMEFS" --thin --poolname=pool00 --name=home --vgname=onn_$namezeus
-logvol /tmp   --fstype="xfs" --size=1024 --label="TMPFS"  --thin --poolname=pool00 --name=tmp  --vgname=onn_$namezeus
-#
-logvol /var/log   --fstype="xfs" --size=8192  --label="LOGFS"  --thin --poolname=pool00 --name=var_log  --vgname=onn_$namezeus
-logvol /var/log/audit --fstype="xfs" --size=2048 --label="AUDITFS" --thin --poolname=pool00 --name=var_log_audit --vgname=onn_$namezeus
-\"\"\"
-
-rootdisk = '$rootpath'
-ovirt_port1 = '$oport1'
-ovirt_port2 = '$oport2'
-gluster_port1 = '$gport1'
-gluster_port2 = '$gport2'
-public_port1 = '$pport1'
-public_port2 = '$pport2'
-
-def lsnet(nicpci):
+def getnet(nicpci):
     netdir = '/sys/class/net'
     ports = os.listdir(netdir)
     for port in ports:
@@ -178,33 +167,12 @@ def lsnet(nicpci):
             return port
     return None
  
-def lsdisk(dsk):
+def getdisk(dsk):
     dpath = '/dev/disk/by-path' + '/' + dsk
     tname = os.readlink(dpath)
     slash = tname.rfind('/')
     tname = tname[slash+1:]
     return tname
-
-with open('/tmp/custom.ks', 'w') as ks:
-    devname = lsdisk(rootdisk)
-    precmd = precmd.replace('$rootdisk', devname)
-    nic = lsnet(ovirt_port1)
-    precmd = precmd.replace('$ovirt_port1', nic)
-    nic = lsnet(ovirt_port2)
-    precmd = precmd.replace('$ovirt_port2', nic)
-    nic = lsnet(gluster_port1)
-    precmd = precmd.replace('$gluster_port1', nic)
-    nic = lsnet(gluster_port2)
-    precmd = precmd.replace('$gluster_port2', nic)
-    nic = lsnet(public_port1)
-    precmd = precmd.replace('$public_port1', nic)
-    nic = lsnet(public_port2)
-    precmd = precmd.replace('$public_port2', nic)
-    ks.write(precmd)
-
-exit(0)
-%end
-"""
 
 class Process_KS(threading.Thread):
     def __init__(self, mwin):
@@ -213,7 +181,7 @@ class Process_KS(threading.Thread):
 
     def run(self):
         global ks_text
-        ovirt_iso = 'ovirt-node-ng-installer-4.3.10-2020060117.el7.iso'
+        ovirt_iso = 'ovirt-node-install.iso'
         ovirt_iso_path = '/run/initramfs/live/LiveOS/' + ovirt_iso
         with open(ovirt_iso_path, "rb") as isoh:
             isoh.seek(0x8028, 0)
@@ -223,6 +191,7 @@ class Process_KS(threading.Thread):
         res = subp.run("sudo mount -o ro "+ovirt_iso_path+" "+srcmnt,
                 shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
         if res.returncode != 0:
+            os.rmdir(srcmnt)
             GLib.idle_add(self.win.task_error, _("Operation Failed\n")+res.stdout)
             return
         isodir = "/tmp/isotop-"+str(os.getpid())
@@ -236,13 +205,21 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$ovirt_ip", self.win.ks_info["ovirt"]["ip"])
         ks_text = ks_text.replace("$gluster_ip", self.win.ks_info["gluster"]["ip"])
         ks_text = ks_text.replace("$public_ip", self.win.ks_info["public"]["ip"])
-        ks_text = ks_text.replace("$rootpath", self.win.ks_info["rootdisk"])
+        ks_text = ks_text.replace("$rootdisk", self.win.ks_info["rootdisk"])
         ks_text = ks_text.replace("$oport1", self.win.ks_info["ovirt"]["port1"])
         ks_text = ks_text.replace("$oport2", self.win.ks_info["ovirt"]["port2"])
         ks_text = ks_text.replace("$gport1", self.win.ks_info["gluster"]["port1"])
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
         ks_text = ks_text.replace("$pport1", self.win.ks_info["public"]["port1"])
         ks_text = ks_text.replace("$pport2", self.win.ks_info["public"]["port2"])
+
+        rootdev = self.win.ks_info["rootdisk"];
+        for dsk in self.win.disks:
+            if dsk[0] != rootdev:
+                continue
+            idx = dsk[1].rfind('/')
+            dsknode = dsk[1][idx+1:]
+            ks_text = ks_text.replace("$rootwwid", dsknode)
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
@@ -255,8 +232,8 @@ class Process_KS(threading.Thread):
             idx += 1
             row = self.win.ntplist.get_row_at_index(idx)
         if idx > 0:
-            sedcmd += '-e \'/^server 3/a' + ntpsvrs + '\' '
-        sedcmd += '-e \'$aserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10\\n\''
+            sedcmd += '-e \'/^#manycastclient/a' + ntpsvrs + '\' '
+        sedcmd += '-e \'$a#\\n# use local clock\\nserver 127.127.1.0\\nfudge 127.127.1.0 stratum 10\\n\''
         ks_text = ks_text.replace("$sedcmd", sedcmd);
 
         with open(kscfg, "w") as ksfile:
@@ -836,10 +813,10 @@ class MainWin(Gtk.Window):
         public_port2 = self.public_port2.get_active_text()
         public_ip = self.public_ip.get_text()
 
-        self.ks_info = {"hostname": hostname, "rootdisk": disk,
-                "ovirt": {"ip": ovirt_ip, "port1": ovirt_port1, "port2": ovirt_port2},
-                "gluster": {"ip": gluster_ip, "port1": gluster_port1, "port2": gluster_port2},
-                "public": {"ip": public_ip, "port1": public_port1, "port2": public_port2},
+        self.ks_info = {"hostname": hostname, "rootdisk": getdisk(disk),
+                "ovirt": {"ip": ovirt_ip, "port1": getnet(ovirt_port1), "port2": getnet(ovirt_port2)},
+                "gluster": {"ip": gluster_ip, "port1": getnet(gluster_port1), "port2": getnet(gluster_port2)},
+                "public": {"ip": public_ip, "port1": getnet(public_port1), "port2": getnet(public_port2)},
                 "usbdisk": usbstick
                 }
         self.set_sensitive(False)
