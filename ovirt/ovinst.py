@@ -74,6 +74,8 @@ def xorriso(isotop, **kargs):
     print(cmd)
     res = subp.run(cmd, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
     print(res.stdout)
+    if res.returncode == 0:
+        shutil.rmtree(isotop)
     return (res.returncode, res.stdout)
 
 ks_text = """#use command line install mode
@@ -107,27 +109,16 @@ network --device=ovirt --activate --bootproto=static --ip=$ovirt_ip --netmask=25
 network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gport1'{\\"prio\\":-10, \\"sticky\\": true}',$gport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
 network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$pport1'{\\"prio\\":-10, \\"sticky\\": true}',$pport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
 # ignore all other disks
-zerombr
 ignoredisk --only-use=$rootdisk
+zerombr
 # System bootloader configuration
 bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=$rootdisk
 # Partition clearing information
 clearpart --all --initlabel --drives=$rootdisk
 # Disk partitioning information
-part /boot/efi --fstype="efi" --ondisk=$rootdisk --size=256 --label="SYS_EFISP"
-part /boot --fstype="ext2" --ondisk=$rootdisk --size=2048 --label="SYS_BOOTFS"
-#
-part pv.407 --fstype="lvmpv" --ondisk=$rootdisk --size=70000 --grow
-volgroup onn_$namezeus --pesize=4096 pv.407
-logvol none  --fstype="None" --size=60000 --thinpool --metadatasize=4096 --chunksize=65536 --name=pool00 --vgname=onn_$namezeus
-#
-logvol swap  --fstype="swap" --size=4096  --label="SYS_SWAP" --name=swap --vgname=onn_$namezeus
-logvol /     --fstype="xfs" --size=10240  --label="SYS_ROOTFS" --thin --poolname=pool00 --name=root --vgname=onn_$namezeus
-logvol /var  --fstype="xfs" --size=10240  --label="SYS_VARFS"  --thin --poolname=pool00 --name=var  --vgname=onn_$namezeus
-logvol /home  --fstype="xfs" --size=4096 --label="USER_HOMEFS" --thin --poolname=pool00 --name=home --vgname=onn_$namezeus
+autopart --type=thinp
 
 %post --erroronfail
-imgbase layout --init
 
 [ -d /etc/multipath/conf.d ] || mkdir -p /etc/multipath/conf.d
 cat > /etc/multipath/conf.d/usb-storage.conf <<EOD
@@ -141,8 +132,12 @@ blacklist {
 }
 EOD
 
+mkdir /var/log/journal
+
 sed -i -e '$a127.0.1.1\\t$namezeus\\n' /etc/hosts
 sed -i $sedcmd /etc/ntp.conf
+
+imgbase layout --init
 
 %end
 
@@ -150,6 +145,10 @@ sed -i $sedcmd /etc/ntp.conf
 pwpolicy root --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 pwpolicy user --minlen=6 --minquality=1 --notstrict --nochanges --emptyok
 pwpolicy luks --minlen=6 --minquality=1 --notstrict --nochanges --notempty
+%end
+
+%pre --interpreter=/bin/bash
+dd if=/dev/zero of=/dev/$rootdisk bs=256K count=512 oflag=direct conv=nocreat
 %end
 """
 
@@ -195,9 +194,17 @@ class Process_KS(threading.Thread):
             GLib.idle_add(self.win.task_error, _("Operation Failed\n")+res.stdout)
             return
         isodir = "/tmp/isotop-"+str(os.getpid())
-        shutil.copytree(srcmnt, isodir, symlinks=True)
+        copyfailed = False
+        try:
+            shutil.copytree(srcmnt, isodir, symlinks=True)
+        except:
+            copyfailed = True
         subp.run("sudo umount " + srcmnt, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
         os.rmdir(srcmnt)
+        if copyfailed:
+            shutil.rmtree(isodir)
+            GLib.idle_add(self.win.task_error, _("Operation Failed\n"))
+            return
 
         kscfg = isodir + "/interactive-defaults.ks"
         os.chmod(kscfg, 0o644)
@@ -212,14 +219,6 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
         ks_text = ks_text.replace("$pport1", self.win.ks_info["public"]["port1"])
         ks_text = ks_text.replace("$pport2", self.win.ks_info["public"]["port2"])
-
-        rootdev = self.win.ks_info["rootdisk"];
-        for dsk in self.win.disks:
-            if dsk[0] != rootdev:
-                continue
-            idx = dsk[1].rfind('/')
-            dsknode = dsk[1][idx+1:]
-            ks_text = ks_text.replace("$rootwwid", dsknode)
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
