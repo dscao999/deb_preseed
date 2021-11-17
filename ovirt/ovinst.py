@@ -85,8 +85,6 @@ graphical
 eula --agreed
 # System authorization information
 auth --enableshadow --passalgo=sha512
-# Use Live Image installation media
-liveimg --url=file:///run/install/repo/ovirt-node-ng-image.squashfs.img
 # Keyboard layouts
 keyboard --vckeymap=us --xlayouts='us'
 # System language
@@ -103,20 +101,23 @@ user --groups=wheel --name=lenovo --password=$6$dBtyehHvnQ6ss$VhiwJ1ISBLZvdnudHj
 firewall --disabled
 selinux --disabled
 # Network information
+network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$pport1'{\\"prio\\":-10, \\"sticky\\": true}',$pport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
+network --device=ovirt --bootproto=static --ip=$ovirt_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$oport1'{\\"prio\\":-10, \\"sticky\\": true}',$oport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
+network --device=gluster --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gport1'{\\"prio\\":-10, \\"sticky\\": true}',$gport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
 network --hostname=$namezeus
 
-network --device=ovirt --activate --bootproto=static --ip=$ovirt_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$oport1'{\\"prio\\":-10, \\"sticky\\": true}',$oport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
-network --device=gluster --activate --bootproto=static --ip=$gluster_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$gport1'{\\"prio\\":-10, \\"sticky\\": true}',$gport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
-network --device=public --activate --bootproto=static --ip=$public_ip --netmask=255.255.255.0 --nodefroute --nodns --noipv6 --teamslaves="$pport1'{\\"prio\\":-10, \\"sticky\\": true}',$pport2'{\\"prio\\":100}'" --teamconfig="{\\"runner\\": {\\"name\\": \\"activebackup\\"}}"
 # ignore all other disks
 ignoredisk --only-use=$rootdisk
-zerombr
 # System bootloader configuration
-bootloader --append=" crashkernel=auto" --location=mbr --boot-drive=$rootdisk
+bootloader --append="nopti noibrs noibpb crashkernel=auto" --location=mbr --boot-drive=$rootdisk
 # Partition clearing information
-clearpart --all --initlabel --drives=$rootdisk
+zerombr
+clearpart --drives=$rootdisk --initlabel 
 # Disk partitioning information
 autopart --type=thinp
+
+# Use Live Image installation media
+liveimg --url=file:///run/install/repo/ovirt-node-ng-image.squashfs.img
 
 %post --erroronfail
 
@@ -125,10 +126,8 @@ cat > /etc/multipath/conf.d/usb-storage.conf <<EOD
 blacklist {
 	property "ID_USB_INTERFACE_NUM"
 	property "ID_CDROM"
-}
 
-blacklist {
-    devnode "$rootdisk"
+        devnode "$rootdisk"
 }
 EOD
 
@@ -146,11 +145,24 @@ pwpolicy root --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 pwpolicy user --minlen=6 --minquality=1 --notstrict --nochanges --emptyok
 pwpolicy luks --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 %end
-
-%pre --interpreter=/bin/bash
-dd if=/dev/zero of=/dev/$rootdisk bs=256K count=512 oflag=direct conv=nocreat
-%end
 """
+
+def wipe_disk(disks, dsk):
+    found = 0
+    for disk in disks:
+        if dsk != disk[0]:
+            continue
+        found = 1
+    if found == 0:
+        return
+
+    fd = os.open(disk[1], os.O_WRONLY)
+    if fd >= 0:
+        buf = b'\000'*(256*1024)
+        for i in range(16384):
+            os.write(fd, buf)
+        os.close(fd)
+        os.sync()
 
 def getnet(nicpci):
     netdir = '/sys/class/net'
@@ -167,6 +179,8 @@ def getnet(nicpci):
     return None
  
 def getdisk(dsk):
+    if dsk.startswith('Volume'):
+        return 'md/'+dsk
     dpath = '/dev/disk/by-path' + '/' + dsk
     tname = os.readlink(dpath)
     slash = tname.rfind('/')
@@ -267,9 +281,40 @@ def iscdrom(path, rootwin):
     return iscd
 
 def lsdisk(rootwin):
+    slaves = []
+    devpairs = [('None', 'None')]
+    tpath = '/dev/md'
+    with os.scandir(tpath) as lndevs:
+        for lndev in lndevs:
+            pname = lndev.name
+            if not lndev.is_symlink():
+                continue
+            part = pname.find("-part")
+            vol = pname.find("Volume")
+            if part != -1 or vol != 0:
+                continue
+
+            tname = os.readlink(tpath + '/' + pname)
+            slash = tname.rfind('/')
+            if slash != -1:
+                tname = tname[slash+1:]
+            with os.scandir('/sys/block/'+tname+'/slaves') as subors:
+                for slave in subors:
+                    if slave in slaves:
+                        continue
+                    slaves.append(slave.name)
+            curtup = (pname, '/dev/'+tname)
+            skip = 0
+            for tup in devpairs:
+                if tup[1] == curtup[1]:
+                    skip = 1
+                    break
+            if skip == 1:
+                continue
+            devpairs.append(curtup)
+
     tpath = '/dev/disk/by-path'
     with os.scandir(tpath) as lndevs:
-        devpairs = [('None', 'None')]
         for lndev in lndevs:
             pname = lndev.name
             if not lndev.is_symlink():
@@ -285,6 +330,8 @@ def lsdisk(rootwin):
             slash = tname.rfind('/')
             if slash != -1:
                 tname = tname[slash+1:]
+            if tname in slaves:
+                continue
             curtup = (pname, '/dev/'+tname)
             skip = 0
             for tup in devpairs:
@@ -676,6 +723,7 @@ class MainWin(Gtk.Window):
         self.ntpentry.set_width_chars(16)
         grid.attach(self.ntpentry, 3, row+1, 1, 1)
         self.ntpentry.show()
+        self.ntpentry.connect("activate", self.ntpadd_clicked)
         but = Gtk.Button(label=_("<<Add"))
         grid.attach(but, 2, row+1, 1, 1)
         but.show()
@@ -821,6 +869,8 @@ class MainWin(Gtk.Window):
         self.set_sensitive(False)
         wcursor = Gdk.Cursor(Gdk.CursorType.WATCH)
         self.get_window().set_cursor(wcursor)
+        self.wipe1 = threading.Thread(target=wipe_disk, args=(self.disks, disk))
+        self.wipe1.start()
         self.task = Process_KS(self)
         self.task.start()
         GLib.idle_add(self.check_task)
@@ -828,10 +878,12 @@ class MainWin(Gtk.Window):
     def check_task(self):
         if not self.task:
             return False
-        if self.task.is_alive():
+        if self.task.is_alive() or self.wipe1.is_alive():
             time.sleep(0.3)
             return True
         self.task.join()
+        self.wipe1.join()
+
         if self.task.res[0] == 0:
             echo = EchoInfo(self, _("Task Ended"));
         else:
