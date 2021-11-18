@@ -347,16 +347,16 @@ def lsdisk(rootwin):
                 pname = lndev.name
                 if not lndev.is_symlink():
                     continue
-                part = pname.find("-part")
-                if part != -1:
-                    continue
                 tname = os.readlink(tpath + '/' + pname)
                 slash = tname.rfind('/')
                 if slash != -1:
                     tname = tname[slash+1:]
-                with open('/sys/block/'+tname+'/size', 'r') as fin:
+                sizfile = '/sys/block/'+tname+'/size'
+                if not os.path.isfile(sizfile):
+                    continue
+                with open(sizfile, 'r') as fin:
                     fsize = int(fin.read())
-                if fsize < 20971520:
+                if fsize < 33554432:
                     continue
                 with os.scandir('/sys/block/'+tname+'/slaves') as subors:
                     for slave in subors:
@@ -379,9 +379,8 @@ def lsdisk(rootwin):
             pname = lndev.name
             if not lndev.is_symlink():
                 continue
-            part = pname.find("-part")
             usb = pname.find("usb")
-            if part != -1 or usb != -1:
+            if usb != -1:
                 continue
             if iscdrom(tpath+'/'+pname, rootwin):
                 continue
@@ -390,7 +389,14 @@ def lsdisk(rootwin):
             slash = tname.rfind('/')
             if slash != -1:
                 tname = tname[slash+1:]
+            sizfile = '/sys/block/'+tname+'/size'
+            if not os.path.isfile(sizfile):
+                continue
             if tname in slaves:
+                continue
+            with open(sizfile, 'r') as fin:
+                fsize = int(fin.read())
+            if fsize < 33554432:
                 continue
             curtup = (pname, '/dev/'+tname)
             skip = 0
