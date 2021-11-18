@@ -122,12 +122,14 @@ liveimg --url=file:///run/install/repo/ovirt-node-ng-image.squashfs.img
 %post --erroronfail
 
 [ -d /etc/multipath/conf.d ] || mkdir -p /etc/multipath/conf.d
-cat > /etc/multipath/conf.d/usb-storage.conf <<EOD
+cat > /etc/multipath/conf.d/49-usb_cdrom.conf <<EOD
 blacklist {
 	property "ID_USB_INTERFACE_NUM"
 	property "ID_CDROM"
-
-        devnode "$rootdisk"
+}
+EOD
+cat > /etc/multipath/conf.d/10-nvme.conf <<EOD
+blacklist {wwid 1234567890
 }
 EOD
 
@@ -146,6 +148,38 @@ pwpolicy user --minlen=6 --minquality=1 --notstrict --nochanges --emptyok
 pwpolicy luks --minlen=6 --minquality=1 --notstrict --nochanges --notempty
 %end
 """
+def remove_vg(disk):
+    vgres = subp.run('sudo vgdisplay  -c', shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+    for vg in vgres.stdout.split('\n'):
+        if len(vg) == 0:
+            continue
+        vgname = vg.split(':')[0]
+        findpv = subp.run('sudo vgdisplay -v ' + vgname, shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+        if findpv.returncode != 0:
+            print(findpv.stderr)
+            continue
+        pvdisks = []
+        for pvinfo in findpv.stdout.split('\n'):
+            if pvinfo.find('PV Name') == -1:
+                continue
+            pvname = pvinfo.split()[-1]
+            if pvname.find(disk) == -1:
+                continue
+            pvdisks.append(pvname)
+        if len(pvdisks) == 0:
+            continue
+        vgchg = subp.run('sudo vgchange -a n ' + vgname, shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+        if vgchg.returncode != 0:
+            print(vgchg.stderr)
+            continue
+        vgrm = subp.run('sudo vgremove --force ' + vgname, shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+        if vgrm.returncode != 0:
+            print(vgrm.stderr)
+            continue
+        for pvdisk in pvdisks:
+            pvrm = subp.run('sudo pvremove ' + pvdisk, shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+            if pvrm.returncode != 0:
+                print(pvrm.stderr)
 
 def wipe_disk(disks, dsk):
     found = 0
@@ -156,6 +190,7 @@ def wipe_disk(disks, dsk):
     if found == 0:
         return
 
+    remove_vg(disk[1])
     fd = os.open(disk[1], os.O_WRONLY)
     if fd >= 0:
         buf = b'\000'*(256*1024)
@@ -163,6 +198,7 @@ def wipe_disk(disks, dsk):
             os.write(fd, buf)
         os.close(fd)
         os.sync()
+        print(f'Disk {disk[1]} cleaned')
 
 def getnet(nicpci):
     netdir = '/sys/class/net'
@@ -179,9 +215,10 @@ def getnet(nicpci):
     return None
  
 def getdisk(dsk):
-    if dsk.startswith('Volume'):
+    dpath = '/dev/md/' + dsk
+    if os.path.islink(dpath):
         return 'md/'+dsk
-    dpath = '/dev/disk/by-path' + '/' + dsk
+    dpath = '/dev/disk/by-path/' + dsk
     tname = os.readlink(dpath)
     slash = tname.rfind('/')
     tname = tname[slash+1:]
@@ -226,13 +263,33 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$ovirt_ip", self.win.ks_info["ovirt"]["ip"])
         ks_text = ks_text.replace("$gluster_ip", self.win.ks_info["gluster"]["ip"])
         ks_text = ks_text.replace("$public_ip", self.win.ks_info["public"]["ip"])
-        ks_text = ks_text.replace("$rootdisk", self.win.ks_info["rootdisk"])
+        rootdisk = self.win.ks_info["rootdisk"]
+        ks_text = ks_text.replace("$rootdisk", rootdisk)
         ks_text = ks_text.replace("$oport1", self.win.ks_info["ovirt"]["port1"])
         ks_text = ks_text.replace("$oport2", self.win.ks_info["ovirt"]["port2"])
         ks_text = ks_text.replace("$gport1", self.win.ks_info["gluster"]["port1"])
         ks_text = ks_text.replace("$gport2", self.win.ks_info["gluster"]["port2"])
         ks_text = ks_text.replace("$pport1", self.win.ks_info["public"]["port1"])
         ks_text = ks_text.replace("$pport2", self.win.ks_info["public"]["port2"])
+
+        nvme_wwids = []
+        with os.scandir('/sys/block') as blkdirs:
+            for blkdir in blkdirs:
+                devnam = blkdir.name
+                if not devnam.startswith('nvme'):
+                    continue
+                wwid_file = '/sys/block/'+devnam+'/wwid'
+                if not os.path.isfile(wwid_file):
+                    continue
+                wwid = ''
+                with open(wwid_file) as fin:
+                    wwid = fin.read().rstrip('\n')
+                if len(wwid) > 0:
+                    nvme_wwids.append(wwid)
+        repl_string = ''
+        for wwid in nvme_wwids:
+            repl_string += '\n\twwid ' + wwid
+        ks_text = ks_text.replace('wwid 1234567890', repl_string)
 
         idx = 0
         row = self.win.ntplist.get_row_at_index(idx)
@@ -284,34 +341,37 @@ def lsdisk(rootwin):
     slaves = []
     devpairs = [('None', 'None')]
     tpath = '/dev/md'
-    with os.scandir(tpath) as lndevs:
-        for lndev in lndevs:
-            pname = lndev.name
-            if not lndev.is_symlink():
-                continue
-            part = pname.find("-part")
-            vol = pname.find("Volume")
-            if part != -1 or vol != 0:
-                continue
-
-            tname = os.readlink(tpath + '/' + pname)
-            slash = tname.rfind('/')
-            if slash != -1:
-                tname = tname[slash+1:]
-            with os.scandir('/sys/block/'+tname+'/slaves') as subors:
-                for slave in subors:
-                    if slave in slaves:
-                        continue
-                    slaves.append(slave.name)
-            curtup = (pname, '/dev/'+tname)
-            skip = 0
-            for tup in devpairs:
-                if tup[1] == curtup[1]:
-                    skip = 1
-                    break
-            if skip == 1:
-                continue
-            devpairs.append(curtup)
+    if os.path.isdir(tpath):
+        with os.scandir(tpath) as lndevs:
+            for lndev in lndevs:
+                pname = lndev.name
+                if not lndev.is_symlink():
+                    continue
+                part = pname.find("-part")
+                if part != -1:
+                    continue
+                tname = os.readlink(tpath + '/' + pname)
+                slash = tname.rfind('/')
+                if slash != -1:
+                    tname = tname[slash+1:]
+                with open('/sys/block/'+tname+'/size', 'r') as fin:
+                    fsize = int(fin.read())
+                if fsize < 20971520:
+                    continue
+                with os.scandir('/sys/block/'+tname+'/slaves') as subors:
+                    for slave in subors:
+                        if slave in slaves:
+                            continue
+                        slaves.append(slave.name)
+                curtup = (pname, '/dev/'+tname)
+                skip = 0
+                for tup in devpairs:
+                    if tup[1] == curtup[1]:
+                        skip = 1
+                        break
+                if skip == 1:
+                    continue
+                devpairs.append(curtup)
 
     tpath = '/dev/disk/by-path'
     with os.scandir(tpath) as lndevs:
