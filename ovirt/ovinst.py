@@ -273,6 +273,16 @@ class Process_KS(threading.Thread):
         ks_text = ks_text.replace("$pport2", self.win.ks_info["public"]["port2"])
 
         nvme_wwids = []
+        rdsk = '/dev/' + rootdisk
+        if os.path.islink(rdsk):
+            rdsk = os.readlink(rdsk)
+            rslash = rdsk.rfind('/')
+            if rslash != -1:
+                rdsk = rdsk[rslash+1:]
+        if rdsk.startswith('/dev/sd'):
+            res = subp.run('sudo /lib/udev/scsi_id -gus3 ' + rdsk, shell=True, text=True, stdout=subp.PIPE, stderr=subp.PIPE)
+            if res.returncode == 0 and len(res.stdout) > 0:
+                nvme_wwids.append(res.stdout)
         with os.scandir('/sys/block') as blkdirs:
             for blkdir in blkdirs:
                 devnam = blkdir.name
