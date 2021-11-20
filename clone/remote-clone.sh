@@ -34,7 +34,7 @@ while true; do
 done
 if [ -z "$DEPOT" -o -z "$SERVER" ]; then
 	echo "No clone server and/or directory missing"
-	reboot
+	exit 2
 fi
 #
 curdir=${PWD}
@@ -51,7 +51,7 @@ lios_clone()
 	if [ ${nparts} -lt 3 ]
 	then
 		echo "No system to clone. Not a LIOS system?"
-		reboot
+		exit 3
 	fi
 	#
 	echo "Clone LIOS into server: $SERVER, directory: $DEPOT ..."
@@ -180,15 +180,13 @@ restore_to()
 	bootstrap_setup $srcpath $target
 }
 #
+ecode=9
 action=$1
 [ -z "$action" ] && action=clone
 case "$action" in
 	"clone")
 		lios_clone
-		while true; do
-			sleep 3
-			echo "At $(date), waiting"
-		done
+		ecode=$?
 		;;
 	"restore")
 		UEFIBOOT=0
@@ -200,3 +198,4 @@ case "$action" in
 		ecode=9
 		;;
 esac
+exit $ecode
