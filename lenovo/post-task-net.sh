@@ -323,6 +323,20 @@ fi
 #
 sed -i -e '/boot[ \t]/s/defaults/ro,&/' -e '/boot\/efi/s/umask=0077/ro,&/' /etc/fstab
 #
+if [ -d /sys/firmware/efi ]; then
+	rootdisk=$(mount|fgrep " / "|cut -d' ' -f1)
+	suffix=
+	devtyp=${rootdisk:5:3}
+	[ ${devtyp} = "nvm" -o ${devtyp} = "mmc" ] && suffix=p
+	rootdisk=${rootdisk%${suffix}[0-9]}
+	efibootmgr|grep -E 'debian|LIOS'|cut -d* -f1|while read bootnum
+	do
+		bootnum=${bootnum#Boot}
+		efibootmgr -b ${bootnum} -B
+	done
+	efibootmgr -c -d $rootdisk -p 1 -L "Lenovo LIOS" -l /EFI/debian/shimx64.efi
+fi
+#
 wait
 if dpkg --list icaclient; then
 	autoapp=$appdesk/selfservice.desktop
