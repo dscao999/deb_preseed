@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 #
 TARGS=$(getopt -l server:,user:,key:,depot: -o s:u:p:d: -- "$@")
 [ $? -ne 0 ] && exit 1
@@ -38,7 +38,7 @@ if [ -z "$DEPOT" -o -z "$SERVER" ]; then
 fi
 #
 curdir=${PWD}
-srcdir=/mntsrc
+srcdir=/mnt
 SSHCP="ssh -l ${USER} -i ${curdir}/${KEY} ${SERVER}"
 [ ! -d $srcdir ] && mkdir $srcdir
 #
@@ -96,46 +96,76 @@ lios_clone()
 #
 #  set up bootstrap
 #
+SWAP_LABEL=
+SWAP_UUID=
 bootstrap_setup()
 {
-	local srcpath target mbrf
-
-	srcpath=$1
-	target=$2
-	mbrf=$(basename $target)
-	eval $(blkid $target | cut -d: -f2)
-	if [ "$PTTYPE" == "dos" ]
-	then
-		dd if=$target bs=512 count=1 | cat > /tmp/${mbrf}_mbr.dat
-		dd if=$srcpath/grub_code.dat bs=1 count=446 of=/tmp/${mbrf}_mbr.dat \
-			conv=notrunc,nocreat
-		dd if=/tmp/${mbrf}_mbr.dat bs=512 of=$target oflag=direct \
-			conv=nocreat,notrunc
-		dd if=$srcpath/grub_code.dat bs=512 skip=1 of=$target seek=1 \
-			oflag=direct conv=nocreat,notrunc
+	wget ${URL}/sys_disk_partitions.txt
+	rootdev=$(fgrep LIOS_ROOTFS sys_disk_partitions.txt|cut -d: -f1)
+	mount $rootdev /mnt
+	bootdev=$(fgrep LIOS_BOOTFS sys_disk_partitions.txt|cut -d: -f1)
+	mount $bootdev /mnt/boot
+	uefidev=$(fgrep LIOS_ESP sys_disk_partitions.txt|cut -d: -f1)
+	mount $uefidev /mnt/boot/efi
+	mount --rbind /proc /mnt/proc
+	mount --rbind /dev  /mnt/dev
+	mount --rbind /sys  /mnt/sys
+	mount --rbind /run  /mnt/run
+	swapdev=$(fgrep LIOS_SWAP sys_disk_partitions.txt|cut -d: -f1)
+	eval $(cat /tmp/swap-info.txt)
+	chroot /mnt mkswap -L $SWAP_LABEL -U $SWAP_UUID $swapdev
+#
+	if [ "$UEFIBOOT" -eq 0 ]; then
+		echo "Restoring Legacy BIOS boot records"
+		dd if=$TARGET bs=512 count=1 of=/tmp/disk_mbr.dat
+		wget ${URL}/grub_code.dat
+		dd if=grub_code.dat bs=1 count=446 of=/tmp/disk_mbr.dat conv=notrunc
+		dd if=/tmp/disk_mbr.dat bs=512 of=$TARGET conv=notrunc
+		dd if=grub_code.dat bs=512 skip=1 of=$TARGET seek=1 conv=notrunc
+		sync $TARGET
+	elif [ $UEFIBOOT -eq 1 ]; then
+		echo "Restoring UEFI Boot Records"
+		mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars
+		chroot /mnt efibootmgr|grep -E 'debian|LIOS'|cut -d* -f1|while read bootnum
+		do
+			bootnum=${bootnum#Boot}
+			chroot /mnt efibootmgr -b ${bootnum} -B
+		done
+		chroot /mnt efibootmgr -c -d $TARGET -p 1 -L "Lenovo LIOS" -l /EFI/debian/shimx64.efi
+		umount /mnt/sys/firmware/efi/efivars
 	fi
-	if [ $UEFIBOOT -eq 1 ] && ls -ld /sys/firmware/efi > /dev/null 2>&1
-	then
-		efibootmgr -c -d $target -p 1 -L "LIOS" -l '\EFI\debian\shimx64.efi'
+#
+	umount /mnt/run
+	umount /mnt/sys
+	umount /mnt/dev/pts
+	umount /mnt/dev
+	umount /mnt/proc
+	umount /mnt/boot/efi
+	umount /mnt/boot
+	umount /mnt
+}
+#
+# find the hard disk
+#
+lsdisk()
+{
+	numdisks=$(ls -l /sys/block|grep -E 'virtual|total|usb' -v|wc -l)
+	if [ $numdisks -gt 1 ]; then
+		echo "Number of disks: $numdisks > 1, Cannot restore without user interaction."
+		exit 15
 	fi
+	disk=$(ls -l /sys/block|grep -E 'virtual|usb|total' -v|sed -e 's/  *//g'|cut -d'>' -f2)
+	disk=$(basename $disk)
 }
 #
 restore_to()
 {
-	local srcpath target device odevice
-
-	srcpath=$1
-	target=$2
-	echo "Warning: All data on disk $target will be erased!"
-	read -p "Continue?[N]" confirm
-	[ "x$confirm" != "xY" ] && return
-	echo "Will restore from $srcpath to $target"
-	tweak_sfdisk
-	./tweak_sfdisk.py $target $srcpath /tmp/sys_disk_sfdisk.dat /tmp/sys_disk_partitions.txt
-	rm tweak_sfdisk.py
-	sfdisk $target < /tmp/sys_disk_sfdisk.dat
+	echo "Will restore from $SERVER:$DEPOT to $TARGET"
+	echo "Warning: All data on disk $TARGET will be erased!"
+	wget -O - ${URL}/sys_disk_sfdisk.dat|sfdisk $TARGET
 	sync
 #
+	wget -O - ${URL}/sys_disk_partitions.txt | \
 	while read diskpart label_info
 	do
 		device=${diskpart%:*}
@@ -144,16 +174,16 @@ restore_to()
 		case $TYPE in
 		vfat)
 			uuid=${UUID%-*}${UUID#*-}
-			mkfs -t $TYPE -n $LABEL -F 32 -i $uuid $device
+			mkfs.fat -n $LABEL -F 32 -i $uuid $device
 			;;
 		swap)
-			mkswap -L $LABEL -U $UUID $device
+			echo "SWAP_UUID=\"$UUID\" SWAP_LABEL=\"$LABEL\"" > /tmp/swap-info.txt
 			;;
 		xfs)
-			mkfs -t $TYPE -m uuid=$UUID -L $LABEL -f $device
+			mkfs.xfs -m uuid=$UUID -L $LABEL -f $device
 			;;
 		ext2)
-			mkfs -t $TYPE -L $LABEL -U $UUID $device
+			mkfs.ext2 -L $LABEL -U $UUID $device
 			continue
 			;;
 		*)
@@ -163,21 +193,15 @@ restore_to()
 		esac
 		[ "$TYPE" = "swap" -o "$TYPE" = "ext2" ] && continue
 #
-		fin=0
-		dots=0
-		{
-			mount -t $TYPE $device /mnt
-			pushd /mnt
-			echo "Restoring contents from $srcpath/sys_disk_${LABEL}.cpio ..."
-			cpio --block-size=256 -id < $srcpath/sys_disk_${LABEL}.cpio
-			[ "$LABEL" = "LIOS_ESP" -a -f EFI/debian/shimx64.efi ] && \
-				UEFIBOOT=1
-			popd
-			echo "Umounting $device"
-			umount /mnt
-		}
-	done < /tmp/sys_disk_partitions.txt
-	bootstrap_setup $srcpath $target
+		echo "Restoring contents from $DEPOT/sys_disk_${LABEL}.tar ..."
+		mount -t $TYPE $device /mnt
+		cd /mnt
+		wget -O - ${URL}/sys_disk_${LABEL}.tar | tar -xf -
+		cd $curdir
+		echo "Umounting $device"
+		umount /mnt
+	done
+	bootstrap_setup
 }
 #
 ecode=9
@@ -190,7 +214,14 @@ case "$action" in
 		;;
 	"restore")
 		UEFIBOOT=0
-		echo "Please select the resotre image: "
+		if ls -ld /sys/firmware/efi; then
+			UEFIBOOT=1
+		fi
+		disk=
+		lsdisk
+		TARGET=/dev/$disk
+		URL=http://${SERVER}/${DEPOT#/var/www/html/}
+		restore_to
 		ecode=$?
 		;;
 	"*")
