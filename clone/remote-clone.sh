@@ -217,10 +217,17 @@ case "$action" in
 		if ls -ld /sys/firmware/efi; then
 			UEFIBOOT=1
 		fi
+		URL=http://${SERVER}/${DEPOT#/var/www/html/}
 		disk=
 		lsdisk
 		TARGET=/dev/$disk
-		URL=http://${SERVER}/${DEPOT#/var/www/html/}
+		TARSIZ=$(cat /sys/block/$disk/size)
+		SRCSIZ=$(wget -O - $URL/sys_disk_size.txt)
+		if [ $TARSIZ -lt $SRCSIZ ]; then
+			echo "Source disk size: $SRCSIZ, Target disk size: $TARSIZ"
+			echo "Cannot perform the OS restore"
+			exit 19
+		fi
 		restore_to
 		ecode=$?
 		;;
