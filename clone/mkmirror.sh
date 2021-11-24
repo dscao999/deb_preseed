@@ -137,8 +137,13 @@ done
 			echo "Complete"
 		fi
 	fi
+	if [ $cpdepot -eq 0 ]; then
+		pushd /mnt
+		xzcat ${cdmedium}/live/clone-restore.cpio.xz | sudo cpio -id
+		popd
+	fi
 #
-	[ $cpdepot -eq 1 ] && echo -n "Unmounting /mnt ..."
+	echo -n "Unmounting /mnt ..."
 	sudo umount /mnt
 	echo ""
 } &
@@ -166,7 +171,7 @@ function setup_legacy()
 	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat oflag=direct
 	sudo dd if=$biosdat of=${device} bs=512 skip=1 seek=1 oflag=direct conv=nocreat
 }
-lineno=176
+lineno=181
 tail --lines=+${lineno} ${0} > $biosdat
 touch mbr.dat
 setup_legacy
