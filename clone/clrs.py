@@ -108,6 +108,7 @@ class MWindow(Gtk.Window):
         svrlabel.show()
         self.svrdir = Gtk.Entry()
         self.svrdir.set_text(dir_prefix)
+        self.svrdir.set_editable(False)
         self.svrdir.set_max_width_chars(24)
         hbox.pack_start(self.svrdir, True, True, 0)
         self.svrdir.show()
@@ -122,14 +123,23 @@ class MWindow(Gtk.Window):
         okbut = Gtk.Button(label=_("Begin"))
         hbox.pack_start(okbut, True, True, 10)
         okbut.show()
-        okbut.connect("clicked", self.begin_operation)
-        exbut = Gtk.Button(label=_("Exit"))
-        hbox.pack_start(exbut, True, True, 10)
-        exbut.show()
-        exbut.connect("clicked", Gtk.main_quit)
+        okbut.connect("clicked", self.operation_setup)
 
-    def begin_operation(self, but):
-        global pxelinux, conn
+        self.pxefile = None
+        self.parmfile = None
+        self.keyfile = None
+
+    def operation_finish(self, bug):
+        if self.pxefile:
+            os.remove(self.pxefile)
+        if self.parmfile:
+            os.remove(self.parmfile)
+        if self.keyfile:
+            os.remove(self.keyfile)
+        Gtk.main_quit()
+
+    def operation_setup(self, but):
+        global pxelinux, conn, dir_prefix
 
         macaddr = self.mac_entry.get_text()
         if not macaddr or len(macaddr) == 0:
@@ -149,32 +159,43 @@ class MWindow(Gtk.Window):
         if self.restore_but.get_active():
             action = 'restore'
         macaddr = macaddr.replace(':', '-')
-        print(f'Mac: {macaddr} IP: {svrip} DIR: {svrdir} ACTION: {action}')
-        pxefile = '/var/svr/tftp/debian-installer/amd64/pxelinux.cfg/01-'+macaddr
-        with open(pxefile, "w") as pxe:
-            pxelinux = pxelinux.replace('$SERVER', svrip)
-            pxe.write(pxelinux)
-        keyname = dir_prefix + '/operation.id'
-        parmfile = dir_prefix + '/conn-' + macaddr + '.txt'
-        conn = conn.replace('$ACTION', action)
-        conn = conn.replace('$USER', username)
-        conn = conn.replace('$SERVER', svrip)
-        conn = conn.replace('$DEPOT', svrdir)
-        conn = conn.replace('$PRVKEY', 'operation.id')
-        with open(parmfile, "w") as parm:
-            parm.write(conn)
+        backup_dir = svrdir + '/' + macaddr
+        if action == 'clone' and os.path.isdir(backup_dir):
+            echo = EchoInfo(self, "Backup directory "+backup_dir+' already exists')
+            echo.run()
+            echo.destroy()
+            return
+        if action == 'restore' and not os.path.isdir(backup_dir):
+            echo = EchoInfo(self, "Backup directory "+backup_dir+' does not exist')
+            echo.run()
+            echo.destroy()
+            return
+
+        self.pxefile = '/var/svr/tftp/debian-installer/amd64/pxelinux.cfg/01-'+macaddr
+        with open(self.pxefile, "w") as pxe:
+            pxecfg = pxelinux.replace('$SERVER', svrip)
+            pxe.write(pxecfg)
+        self.keyfile = dir_prefix + '/operation.id'
+        self.parmfile = dir_prefix + '/conn-' + macaddr + '.txt'
+        coninfo = conn.replace('$ACTION', action)
+        coninfo = coninfo.replace('$USER', username)
+        coninfo = coninfo.replace('$SERVER', svrip)
+        coninfo = coninfo.replace('$DEPOT', svrdir)
+        coninfo = coninfo.replace('$PRVKEY', 'operation.id')
+        with open(self.parmfile, "w") as parm:
+            parm.write(coninfo)
         if os.path.isfile('operation.id'):
             os.remove('operation.id')
         if os.path.isfile('operation.id.pub'):
             os.remove('operation.id.pub')
-        res = subp.run(['ssh-keygen', '-t', 'ecdsa',  '-N',  '""', '-f', 'operation.id'], text=True,
+        res = subp.run(['ssh-keygen', '-t', 'ecdsa',  '-N',  '', '-f', 'operation.id'], text=True,
                 stdout=subp.PIPE, stderr=subp.STDOUT)
         if res.returncode != 0:
             echo = EchoInfo(self, res.stdout)
             echo.run()
             echo.destroy()
             return
-        shutil.copyfile('operation.id', keyname)
+        shutil.copyfile('operation.id', self.keyfile)
         if not os.path.isdir(homedir+'/.ssh'):
             os.mkdir(homedir+'/.ssh', mode=0o700)
         trustfile = homedir+'/.ssh/authorized_keys'
@@ -188,6 +209,8 @@ class MWindow(Gtk.Window):
             trust_key += pub.read()
         with open(homedir+'/.ssh/authorized_keys', 'w') as trust:
             trust.write(trust_key)
+#        os.remove('operation.id')
+#        os.remove('operation.id.pub')
         if pr == 0:
             os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
         rexp = "'s/([0-9][0-9]*\.){3}[0-9][0-9]*/"+svrip+"/g'"
@@ -198,10 +221,11 @@ class MWindow(Gtk.Window):
             echo.run()
             echo.destroy()
             return
-        echo = EchoInfo(self, _("Setup Complete"))
+        echo = EchoInfo(self, _("Setup Complete\nDo not click OK until the clone/restore is finished"))
         echo.run()
         echo.destroy()
-        Gtk.main_quit()
+
+        self.operation_finish(1)
 
     def on_select_folder(self, widget):
         diag = Gtk.FileChooserDialog(
