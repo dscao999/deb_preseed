@@ -14,6 +14,7 @@ import netutils
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
+lockfile = '/run/lock/pxeclrs'
 dir_prefix = '/var/www/html/clone'
 
 pxelinux = """default clone
@@ -209,8 +210,8 @@ class MWindow(Gtk.Window):
             trust_key += pub.read()
         with open(homedir+'/.ssh/authorized_keys', 'w') as trust:
             trust.write(trust_key)
-#        os.remove('operation.id')
-#        os.remove('operation.id.pub')
+        os.remove('operation.id')
+        os.remove('operation.id.pub')
         if pr == 0:
             os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
         rexp = "'s/([0-9][0-9]*\.){3}[0-9][0-9]*/"+svrip+"/g'"
@@ -256,7 +257,20 @@ gettext.bindtextdomain("lios-clone")
 gettext.textdomain('lios-clone')
 
 win = MWindow()
-win.connect("destroy", Gtk.main_quit)
 win.show()
-Gtk.main()
+try:
+    lock = os.open(lockfile, os.O_WRONLY|os.O_CREAT|os.O_EXCL, mode=0o644)
+    os.close(lock)
+    locked = True
+    win.connect("destroy", Gtk.main_quit)
+    Gtk.main()
+except:
+    echo = EchoInfo(win, _("Another instance of pxeclrs is already running"))
+    echo.run()
+    echo.destroy()
+    win.destroy()
+    locked = False
+
+if locked:
+    os.remove(lockfile)
 quit(0)
