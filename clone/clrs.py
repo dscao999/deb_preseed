@@ -189,10 +189,9 @@ class MWindow(Gtk.Window):
             os.remove('operation.id')
         if os.path.isfile('operation.id.pub'):
             os.remove('operation.id.pub')
-        rstdir = svrdir + '/' + macaddr
         if action == 'clone':
-            if os.path.isdir(rstdir):
-                echo = EchoInfo(self, "Diretory: " + rstdir + ' already exists')
+            if os.path.isdir(backup_dir):
+                echo = EchoInfo(self, "Diretory: " + backup_dir + ' already exists')
                 echo.run()
                 echo.destroy()
                 return
@@ -222,8 +221,8 @@ class MWindow(Gtk.Window):
             if pr == 0:
                 os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
         elif action == 'restore':
-            if not os.path.isdir(rstdir):
-                echo = EchoInfo(self, "No such diretory: " + rstdir)
+            if not os.path.isdir(backup_dir):
+                echo = EchoInfo(self, "No such diretory: " + backup_dir)
                 echo.run()
                 echo.destroy()
                 return
