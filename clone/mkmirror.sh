@@ -117,36 +117,30 @@ while jobs %% > /dev/null 2>&1; do
 	sleep 1
 done
 #
-{
-	cpdepot=0
-	sudo mount ${device}3 /mnt
-	sudo chown 1000:1000 /mnt
-	cursize=$(df -k | fgrep /var/www/html/debian | awk '{print $3}')
-	cursize=$((cursize+128))
-	dstsize=$(df -k | fgrep /mnt | awk '{print $4}')
-	if [ $cursize -gt 1048576 -a $dstsize -gt $cursize ]
+cpdepot=0
+sudo mount ${device}3 /mnt
+sudo chown 1000:1000 /mnt
+cursize=$(df -k | fgrep /var/www/html/debian | awk '{print $3}')
+cursize=$((cursize+128))
+dstsize=$(df -k | fgrep /mnt | awk '{print $4}')
+if [ $cursize -gt 1048576 -a $dstsize -gt $cursize ]
+then
+	read -p "Would you like copy current debian packages?($((cursize/1048576))G) " ans
+	if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
 	then
-		read -p "Would you like copy current debian packages?($((cursize/1048576))G) " ans
-		if [ x"$ans" == "xy" -o x"$ans" == "xY" ]
-		then
-			cpdepot=1
-			echo -n "Copying $cursize K Bytes, Please be patient..."
-			pushd /var/www/html/debian
-			find . -print | cpio --block-size=256 -pd /mnt
-			popd
-			echo "Complete"
-		fi
-	fi
-	if [ $cpdepot -eq 0 ]; then
-		pushd /mnt
-		xzcat ${cdmedium}/live/clone-restore.cpio.xz | sudo cpio -id
+		cpdepot=1
+		echo -n "Copying $cursize K Bytes, Please be patient..."
+		pushd /var/www/html/debian
+		find . -print | cpio --block-size=256 -pd /mnt &
 		popd
 	fi
+fi
+if [ $cpdepot -eq 0 ]; then
+	pushd /mnt
+	xzcat ${cdmedium}/live/clone-restore.cpio.xz | sudo cpio -id
+	popd
+fi
 #
-	echo -n "Unmounting /mnt ..."
-	sudo umount /mnt
-	echo ""
-} &
 fin=0
 dots=0
 while jobs %% > /dev/null 2>&1 ; do
@@ -161,6 +155,23 @@ while jobs %% > /dev/null 2>&1 ; do
 	fi
 	sleep 1
 done
+echo -n "Unmounting /mnt ..."
+sudo umount /mnt &
+fin=0
+dots=0
+while jobs %% > /dev/null 2>&1 ; do
+	echo -n .
+	dots=$((dots+1))
+	if [ $((dots%80)) -eq 0 ]; then
+		echo
+	fi
+	if [ $fin -ne 0 ]; then
+		kill %%
+		cleanup
+	fi
+	sleep 1
+done
+echo ""
 #
 # setup legacy bios boot code
 #
@@ -171,7 +182,7 @@ function setup_legacy()
 	sudo dd if=mbr.dat of=${device} bs=512 count=1 conv=nocreat oflag=direct
 	sudo dd if=$biosdat of=${device} bs=512 skip=1 seek=1 oflag=direct conv=nocreat
 }
-lineno=181
+lineno=192
 tail --lines=+${lineno} ${0} > $biosdat
 touch mbr.dat
 setup_legacy
