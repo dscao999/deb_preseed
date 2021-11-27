@@ -18,7 +18,7 @@ lockfile = '/run/lock/pxeclrs'
 dir_prefix = '/var/www/html/clone'
 
 pxelinux = """default clone
-say Booting for LIOS clone/restore
+say PXE Booting for LIOS clone/restore
 prompt 0
 timeout 30
 label clone
@@ -131,11 +131,11 @@ class MWindow(Gtk.Window):
         self.keyfile = None
 
     def operation_finish(self, bug):
-        if self.pxefile:
+        if self.pxefile and os.path.isfile(self.pxefile):
             os.remove(self.pxefile)
-        if self.parmfile:
+        if self.parmfile and os.path.isfile(self.parmfile):
             os.remove(self.parmfile)
-        if self.keyfile:
+        if self.keyfile and os.path.isfile(self.keyfile):
             os.remove(self.keyfile)
         Gtk.main_quit()
 
@@ -189,31 +189,45 @@ class MWindow(Gtk.Window):
             os.remove('operation.id')
         if os.path.isfile('operation.id.pub'):
             os.remove('operation.id.pub')
-        res = subp.run(['ssh-keygen', '-t', 'ecdsa',  '-N',  '', '-f', 'operation.id'], text=True,
-                stdout=subp.PIPE, stderr=subp.STDOUT)
-        if res.returncode != 0:
-            echo = EchoInfo(self, res.stdout)
-            echo.run()
-            echo.destroy()
-            return
-        shutil.copyfile('operation.id', self.keyfile)
-        if not os.path.isdir(homedir+'/.ssh'):
-            os.mkdir(homedir+'/.ssh', mode=0o700)
-        trustfile = homedir+'/.ssh/authorized_keys'
-        pr = 0
-        trust_key = ''
-        if os.path.isfile(trustfile):
-            pr = 1
-            with open(trustfile, 'r') as trust:
-                trust_key = trust.read()
-        with open('operation.id.pub', 'r') as pub:
-            trust_key += pub.read()
-        with open(homedir+'/.ssh/authorized_keys', 'w') as trust:
-            trust.write(trust_key)
-        os.remove('operation.id')
-        os.remove('operation.id.pub')
-        if pr == 0:
-            os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
+        rstdir = svrdir + '/' + macaddr
+        if action == 'clone':
+            if os.path.isdir(rstdir):
+                echo = EchoInfo(self, "Diretory: " + rstdir + ' already exists')
+                echo.run()
+                echo.destroy()
+                return
+            res = subp.run(['ssh-keygen', '-t', 'ecdsa',  '-N',  '', '-f', 'operation.id'],
+                    text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+            if res.returncode != 0:
+                echo = EchoInfo(self, res.stdout)
+                echo.run()
+                echo.destroy()
+                return
+            shutil.copyfile('operation.id', self.keyfile)
+            if not os.path.isdir(homedir+'/.ssh'):
+                os.mkdir(homedir+'/.ssh', mode=0o700)
+            trustfile = homedir+'/.ssh/authorized_keys'
+            pr = 0
+            trust_key = ''
+            if os.path.isfile(trustfile):
+                pr = 1
+                with open(trustfile, 'r') as trust:
+                    trust_key = trust.read()
+            with open('operation.id.pub', 'r') as pub:
+                trust_key += pub.read()
+            with open(homedir+'/.ssh/authorized_keys', 'w') as trust:
+                trust.write(trust_key)
+            os.remove('operation.id')
+            os.remove('operation.id.pub')
+            if pr == 0:
+                os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
+        elif action == 'restore':
+            if not os.path.isdir(rstdir):
+                echo = EchoInfo(self, "No such diretory: " + rstdir)
+                echo.run()
+                echo.destroy()
+                return
+
         rexp = "'s/([0-9][0-9]*\.){3}[0-9][0-9]*/"+svrip+"/g'"
         res = subp.run("sed -i -E -e "+rexp+" "+dir_prefix+"/preseed-net-clone.cfg",
                 shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
