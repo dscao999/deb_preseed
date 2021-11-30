@@ -16,6 +16,7 @@ from gi.repository import Gtk
 
 lockfile = '/run/lock/pxeclrs'
 dir_prefix = '/var/www/html/clone'
+cur_dir = os.getcwd()
 
 pxelinux = """default clone
 say PXE Booting for LIOS clone/restore
@@ -140,7 +141,7 @@ class MWindow(Gtk.Window):
         Gtk.main_quit()
 
     def operation_setup(self, but):
-        global pxelinux, conn, dir_prefix
+        global pxelinux, conn, dir_prefix, cur_dir
 
         macaddr = self.mac_entry.get_text()
         if not macaddr or len(macaddr) == 0:
@@ -190,11 +191,6 @@ class MWindow(Gtk.Window):
         if os.path.isfile('operation.id.pub'):
             os.remove('operation.id.pub')
         if action == 'clone':
-            if os.path.isdir(backup_dir):
-                echo = EchoInfo(self, "Diretory: " + backup_dir + ' already exists')
-                echo.run()
-                echo.destroy()
-                return
             res = subp.run(['ssh-keygen', '-t', 'ecdsa',  '-N',  '', '-f', 'operation.id'],
                     text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
             if res.returncode != 0:
@@ -202,7 +198,10 @@ class MWindow(Gtk.Window):
                 echo.run()
                 echo.destroy()
                 return
-            shutil.copyfile('operation.id', self.keyfile)
+            if cur_dir != os.path.realpath(dir_prefix):
+                shutil.copyfile('operation.id', self.keyfile)
+            else:
+                os.chmod(self.keyfile, 0o644)
             if not os.path.isdir(homedir+'/.ssh'):
                 os.mkdir(homedir+'/.ssh', mode=0o700)
             trustfile = homedir+'/.ssh/authorized_keys'
@@ -216,16 +215,11 @@ class MWindow(Gtk.Window):
                 trust_key += pub.read()
             with open(homedir+'/.ssh/authorized_keys', 'w') as trust:
                 trust.write(trust_key)
-            os.remove('operation.id')
+            if cur_dir != os.path.realpath(dir_prefix):
+                os.remove('operation.id')
             os.remove('operation.id.pub')
             if pr == 0:
                 os.chmod(homedir+'/.ssh/authorized_keys', 0o600)
-        elif action == 'restore':
-            if not os.path.isdir(backup_dir):
-                echo = EchoInfo(self, "No such diretory: " + backup_dir)
-                echo.run()
-                echo.destroy()
-                return
 
         rexp = "'s/([0-9][0-9]*\.){3}[0-9][0-9]*/"+svrip+"/g'"
         res = subp.run("sed -i -E -e "+rexp+" "+dir_prefix+"/preseed-net-clone.cfg",

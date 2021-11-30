@@ -102,11 +102,14 @@ bootstrap_setup()
 {
 	wget ${URL}/sys_disk_partitions.txt
 	rootdev=$(fgrep LIOS_ROOTFS sys_disk_partitions.txt|cut -d: -f1)
-	mount $rootdev /mnt
+	eval $(fgrep LIOS_ROOTFS sys_disk_partitions.txt|cut -d: -f2)
+	mount -t $TYPE $rootdev /mnt
 	bootdev=$(fgrep LIOS_BOOTFS sys_disk_partitions.txt|cut -d: -f1)
-	mount $bootdev /mnt/boot
+	eval $(fgrep LIOS_BOOTFS sys_disk_partitions.txt|cut -d: -f2)
+	mount -t $TYPE $bootdev /mnt/boot
 	uefidev=$(fgrep LIOS_ESP sys_disk_partitions.txt|cut -d: -f1)
-	mount $uefidev /mnt/boot/efi
+	eval $(fgrep LIOS_ESP sys_disk_partitions.txt|cut -d: -f2)
+	mount -t $TYPE $uefidev /mnt/boot/efi
 	mount --rbind /proc /mnt/proc
 	mount --rbind /dev  /mnt/dev
 	mount --rbind /sys  /mnt/sys
@@ -184,14 +187,13 @@ restore_to()
 			;;
 		ext2)
 			mkfs.ext2 -L $LABEL -U $UUID $device
-			continue
 			;;
 		*)
 			echo "Unknown file system type: $TYPE"
 			continue
 			;;
 		esac
-		[ "$TYPE" = "swap" -o "$TYPE" = "ext2" ] && continue
+		[ "$TYPE" = "swap" ] && continue
 #
 		echo "Restoring contents from $DEPOT/sys_disk_${LABEL}.tar ..."
 		mount -t $TYPE $device /mnt
