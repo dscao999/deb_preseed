@@ -612,22 +612,6 @@ class MainWin(Gtk.Window):
         grid.attach(self.ddev1, 2, row, 2, 1)
         row += 1
 
-        self.seldsk2 = Gtk.ComboBoxText()
-        self.seldsk2.set_entry_text_column(0)
-        for disk in self.disks:
-            self.seldsk2.append_text(disk[0])
-        self.seldsk2.set_active(0)
-        self.seldsk2.connect("changed", self.on_disk_changed)
-        self.seldsk2.show()
-        grid.attach(self.seldsk2, 1, row, 1, 1)
-        self.ddev2 = Gtk.Entry()
-        self.ddev2.set_text(self.disks[0][1])
-        self.ddev2.set_max_width_chars(12)
-        self.ddev2.set_editable(False)
-        self.ddev2.show()
-        grid.attach(self.ddev2, 2, row, 2, 1)
-        row += 1
-
         sep = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep.show()
         grid.attach(sep, 0, row, 4, 1)
@@ -834,20 +818,9 @@ class MainWin(Gtk.Window):
             echo.destroy()
             return False
 
-        disk1 = self.seldsk1.get_active_text()
-        disk2 = self.seldsk2.get_active_text()
-        if disk1 == 'None' and disk2 == 'None':
+        disk = self.seldsk1.get_active_text()
+        if disk == 'None':
             echo = EchoInfo(self, _("At lease one disk must be selected as root disk"))
-            echo.run()
-            echo.destroy()
-            return False
-        if disk1 == disk2:
-            echo = EchoInfo(self, _("Two disks for the rootfs cannot be the same"))
-            echo.run()
-            echo.destroy()
-            return False
-        if disk1 != 'None' and disk2 != 'None':
-            echo = EchoInfo(self, _("Disk mirror for rootfs is currently not supported"))
             echo.run()
             echo.destroy()
             return False
@@ -916,13 +889,7 @@ class MainWin(Gtk.Window):
                 return
             echo.destroy()
 
-        disk = 'None'
-        disk1 = self.seldsk1.get_active_text()
-        disk2 = self.seldsk2.get_active_text()
-        if disk1 != 'None':
-            disk = disk1
-        elif disk2 != 'None':
-            disk = disk2
+        disk = self.seldsk1.get_active_text()
 
         ovirt_port1 = self.ovirt_port1.get_active_text()
         ovirt_port2 = self.ovirt_port2.get_active_text()
