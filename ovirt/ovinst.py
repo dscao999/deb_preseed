@@ -138,6 +138,8 @@ mkdir /var/log/journal
 sed -i -e '$a127.0.1.1\\t$namezeus\\n' /etc/hosts
 sed -i $sedcmd /etc/ntp.conf
 
+ssh-keygen -t ecdsa -N "" -f /root/.ssh/id_ecdsa
+
 imgbase layout --init
 
 %end
