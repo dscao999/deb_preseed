@@ -119,6 +119,8 @@ autopart --type=thinp
 # Use Live Image installation media
 liveimg --url=file:///run/install/repo/ovirt-node-ng-image.squashfs.img
 
+poweroff
+
 %post --erroronfail
 
 [ -d /etc/multipath/conf.d ] || mkdir -p /etc/multipath/conf.d
@@ -186,9 +188,9 @@ def remove_vg(disk):
 def wipe_disk(disks, dsk):
     found = 0
     for disk in disks:
-        if dsk != disk[0]:
-            continue
-        found = 1
+        if dsk == disk[0]:
+            found = 1
+            break
     if found == 0:
         return
 
