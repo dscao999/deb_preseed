@@ -263,6 +263,17 @@ _ = gettext.gettext
 gettext.bindtextdomain("lios-clone")
 gettext.textdomain('lios-clone')
 
+real_prefix = '/var/www/html/debian'
+if not os.path.isdir(real_prefix+'/clone'):
+    mcwd = os.getcwd()
+    os.chdir(real_prefix)
+    cmd = "xzcat /run/live/medium/live/clone-restore.cpio.xz|cpio -id"
+    task = subp.run(cmd, shell=True, stdout=subp.PIPE, stderr=subp.STDOUT, text=True)
+    if task.returncode != 0:
+        print(task.stdout)
+        sys.exit(9)
+    os.chdir(mcwd)
+
 win = MWindow()
 win.show()
 try:
