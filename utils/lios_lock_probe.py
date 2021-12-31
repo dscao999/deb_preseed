@@ -4,6 +4,8 @@ import argparse
 import os, sys
 import subprocess as subp
 import argparse
+from datetime import datetime
+import binascii
 #
 # lios_probe --hostname hostname --password password
 #
@@ -11,6 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--hostname', help='new hostname')
 parser.add_argument('--password', help='new password')
 parser.add_argument('--username', default='lenovo', help='user name')
+parser.add_argument('--sethostid', help='set a new host id', action='store_true')
 args = parser.parse_args()
 
 lockfile = '/run/lock/lios_probe_lock'
@@ -30,6 +33,17 @@ except:
 fobj = os.fdopen(fd, 'w')
 fobj.write(hostname)
 fobj.close()
+#
+# check if set a new ID for the host
+#
+if args.sethostid:
+    tm = datetime.now()
+    seed = str(datetime.timestamp(tm)) + 'DSCAO__'
+    checksum = binascii.crc32(seed.encode('utf-8'))
+    with open('/etc/hostid', 'w') as fout:
+        fout.write(hex(checksum)[2:]+'\n')
+    os.remove(lockfile);
+    quit(0)
 #
 # change user password
 #

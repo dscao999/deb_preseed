@@ -217,7 +217,7 @@ purge_libreoffice ()
 #
 vmhorizon=lidcc
 lidm_s=192.168.98.104
-lidm_p=7801
+lidm_p=7800
 #
 exec 1> /home/lenovo/rc-local.log 2>&1
 #set -x
@@ -382,6 +382,7 @@ rm -f $vminstf $icaclient $xfce_empty $xfce_def $bigagent
 #
 plymouth-set-default-theme -R lenvdi
 update-grub2
+lios_lock_probe.py --sethostid
 #
 mv /etc/rc.local /etc/rc.local.once
 [ -f /etc/rc.local.orig ] && mv /etc/rc.local.orig /etc/rc.local
