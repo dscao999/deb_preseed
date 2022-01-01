@@ -4,7 +4,6 @@ import argparse
 import os, sys
 import subprocess as subp
 import argparse
-from datetime import datetime
 import binascii
 #
 # lios_probe --hostname hostname --password password
@@ -37,11 +36,11 @@ fobj.close()
 # check if set a new ID for the host
 #
 if args.sethostid:
-    tm = datetime.now()
-    seed = str(datetime.timestamp(tm)) + 'DSCAO__'
-    checksum = binascii.crc32(seed.encode('utf-8'))
-    with open('/etc/hostid', 'w') as fout:
-        fout.write(hex(checksum)[2:]+'\n')
+    with open('/dev/urandom', 'rb') as fin:
+        rid = fin.read(16);
+    hexrid = binascii.hexlify(rid)
+    with open('/etc/hostid', 'wb') as fout:
+        fout.write(hexrid+'\n'.encode('utf-8'))
     os.remove(lockfile);
     quit(0)
 #
