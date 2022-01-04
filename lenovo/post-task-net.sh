@@ -336,6 +336,7 @@ if [ -d /sys/firmware/efi ]; then
 	done
 	efibootmgr -c -d $rootdisk -p 1 -L "Lenovo LIOS" -l /EFI/debian/shimx64.efi
 fi
+sed -i -e '/root_cache/d' /etc/fstab
 #
 wait
 if dpkg --list icaclient; then
@@ -378,7 +379,7 @@ if dpkg --list jpeg-player > /dev/null 2>&1; then
 	fi
 fi
 #
-rm -f $vminstf $icaclient $xfce_empty $xfce_def $bigagent
+#rm -f $vminstf $icaclient $xfce_empty $xfce_def $bigagent
 #
 plymouth-set-default-theme -R lenvdi
 update-grub2
