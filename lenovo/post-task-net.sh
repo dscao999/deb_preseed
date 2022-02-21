@@ -337,6 +337,7 @@ if [ -d /sys/firmware/efi ]; then
 	efibootmgr -c -d $rootdisk -p 1 -L "Lenovo LIOS" -l /EFI/debian/shimx64.efi
 fi
 sed -i -e '/root_cache/d' /etc/fstab
+[ -f /etc/initramfs-tools/modules ] && sed -i -e '$aoverlay' /etc/initramfs-tools/modules
 #
 wait
 if dpkg --list icaclient; then
