@@ -1,0 +1,14 @@
+[Unit]
+Description=Timer Trigger for ping-lidm.service
+After=network-online.target
+Wants=network-online.target
+
+[Timer]
+Unit=ping-lidm.service
+OnActiveSec=5
+OnUnitActiveSec=150
+AccuracySec=15s
+Persistent=false
+
+[Install]
+WantedBy=timers.target
