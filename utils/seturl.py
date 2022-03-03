@@ -67,12 +67,10 @@ class MainWin(Gtk.Window):
             Gtk.main_quit()
             sys.exit(1)
 
-        curl = 'curl -v ' + url + ' 2>&1|grep -E \'^< \' '
-        curlret = subp.run(curl, shell=True, text=True, stdout=subp.PIPE)
+        curl = 'curl --insecure -I ' + url
+        curlret = subp.run(curl, shell=True, text=True, stdout=subp.PIPE, stderr=subp.STDOUT)
         curlstatus = curlret.stdout.split('\n')
-        if curlret.returncode != 0 or (
-                curlstatus[0] != '< HTTP/1.1 200 OK' and
-                curlstatus[0] != '< HTTP/1.0 200 OK'):
+        if curlret.returncode != 0:
             dialog = Gtk.MessageDialog(
                     parent=self,
                     flags=0,
