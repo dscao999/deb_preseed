@@ -1,0 +1,9 @@
+#
+# Startup command and options for live user, in bash variable syntax.
+#
+#COMMAND=/usr/bin/firefox-esr
+#OPTIONS="--kiosk"
+#ARGS="http://www.sohu.com"
+COMMAND="xfce4-terminal --fullscreen --hide-menubar;TERMID=$(pidof xfce4-terminal);while ps -p $TERMID > /dev/null; do sleep 1; done"
+OPTIONS=
+ARGS=

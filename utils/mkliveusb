@@ -1,0 +1,102 @@
+#!/usr/bin/bash -e
+#
+if ! sudo ls /etc > /dev/null
+then
+	echo "Must have sudo capability"
+	exit 10
+fi
+#
+TARGET=$1
+if [ -z "$TARGET" ]
+then
+	echo "A USB Disk must be specified"
+	exit 1
+fi
+if [ "${TARGET##/*/}" = "${TARGET}" ]
+then
+	TARGET="/dev/${TARGET}"
+fi
+if ! udevadm info $TARGET|fgrep ID_BUS=usb > /dev/null
+then
+	echo "A USB Disk must be specified"
+	exit 1
+fi
+#
+MEDIUM=/run/live/medium
+SYS_DEVNAME=$(mount|fgrep $MEDIUM|awk '{print $1}')
+SYSDISK=${SYS_DEVNAME%%[0-9]}
+if [ "$SYSDISK" = "$TARGET" ]
+then
+	echo "The Target USB disk should not be $SYSDISK, which is the live os disk"
+	exit 2
+fi
+#
+MOUNTED=$(mount|fgrep $TARGET|awk '{print $1}')
+if [ -n "$MOUNTED" ]
+then
+	echo "Please umount the target USB $MOUNTED first"
+	exit 3
+fi
+#
+#
+function do_format()
+{
+#  work horse, do the job
+#
+	dd if=/dev/zero bs=128K count=16|tr '\000' '\377'| \
+		sudo dd of=$TARGET bs=128K iflag=fullblock oflag=direct
+	cat <<-EOD | sudo parted $TARGET
+		unit s
+		mklabel gpt
+		mkpart ESP fat32 2048 264192
+		set 1 boot on
+		set 1 esp  on
+		mkpart WINDATA fat32 266240 4460544
+		set 2 msftres off
+		mkpart LIVEOS ext4 4462592 12851200
+	EOD
+#
+	sudo partprobe ${TARGET}
+	while [ ! -b ${TARGET}1 -o ! -b ${TARGET}2 -o ! -b ${TARGET}3 ]
+	do
+		sleep 1
+	done
+	sudo mkfs -t vfat -F 32 -n ESP ${TARGET}1
+	sudo mkfs -t vfat -F 32 -n WINDATA ${TARGET}2
+	sudo mkfs -F -t ext4 -L LIVEOS ${TARGET}3
+}
+#
+# prepare the USB
+#
+do_format
+#
+#  copy EFI bootloader
+#
+sudo mount ${TARGET}1 /mnt
+sudo cp -a ${MEDIUM}/EFI /mnt
+sudo umount /mnt
+#
+# copy live OS files
+#
+sudo mount ${TARGET}3 /mnt
+pushd ${MEDIUM}
+echo -n "Copying Live OS files to ${TARGET}3. This will take minutes..."
+find . -path ./live/filesystem.squashfs -prune -o -print 2> /dev/null | \
+	sudo cpio -pd /mnt
+sudo sync
+echo ""
+popd
+#
+# expand filesystem.squashfs
+#
+sudo unsquashfs -d sqroot $MEDIUM/live/filesystem.squashfs
+pushd sqroot
+gunzip -c $MEDIUM/live/setup-auto-start.cpio.gz | sudo cpio -id
+popd
+#
+sudo mksquashfs sqroot /mnt/live/filesystem.squashfs -comp xz
+sudo sync
+sudo umount /mnt
+sudo rm -rf sqroot
+#
+echo "USB Disk Finished!"

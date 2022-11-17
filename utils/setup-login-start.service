@@ -1,0 +1,24 @@
+## 
+##
+## set up an autostart for live user under lightdm autologin
+##
+## 
+
+
+[Unit]
+Description=Start firefox-esr when auto user login.
+Documentation=man:firefox-esr
+Before=lightdm.service
+After=live-config.service
+Requisite=live-config.service
+ConditionKernelCommandLine=boot=live
+
+[Service]
+User=user
+Group=user
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/sxinit.py
+
+[Install]
+WantedBy=graphical.target
